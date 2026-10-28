@@ -1,0 +1,52 @@
+{
+  "name": "@agent-schedules/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "bun run typecheck && next build",
+    "start": "next start",
+    "typecheck": "next typegen && bun check",
+    "test": "bun test",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@agent-schedules/format": "workspace:*",
+    "@base-ui/react": "catalog:",
+    "@hugeicons/core-free-icons": "catalog:",
+    "@hugeicons/react": "catalog:",
+    "@radix-ui/react-slot": "catalog:",
+    "@t3-oss/env-core": "catalog:",
+    "@tailwindcss/typography": "catalog:",
+    "@upstash/ratelimit": "catalog:",
+    "@upstash/redis": "catalog:",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:",
+    "next": "catalog:",
+    "nuqs": "catalog:",
+    "pg": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-markdown": "catalog:",
+    "sonner": "catalog:",
+    "stripe": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "catalog:",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vercel/config": "catalog:",
+    "drizzle-kit": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "tw-animate-css": "catalog:",
+    "typescript": "catalog:"
+  }
+}

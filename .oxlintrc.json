@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [".next", "dist", "node_modules", "bun.lock"],
+  "plugins": ["eslint", "oxc", "react", "unicorn", "typescript"],
+  "categories": {
+    "correctness": "warn",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "react-in-jsx-scope": "off",
+    "eslint/no-shadow": "off",
+    "eslint/no-await-in-loop": "off",
+    "eslint/curly": ["error", "all"],
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-definitions": ["error", "interface"]
+  },
+  "overrides": [
+    {
+      "files": ["apps/web/src/**/*.{ts,tsx}"],
+      "plugins": ["nextjs"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@fontsource/**", "@fontsource-variable/**"],
+                "message": "Load web fonts through next/font."
+              }
+            ]
+          }
+        ],
+        "nextjs/no-page-custom-font": "error",
+        "nextjs/no-html-link-for-pages": "off",
+        "nextjs/no-img-element": "off"
+      }
+    }
+  ]
+}

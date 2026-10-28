@@ -1,0 +1,36 @@
+{
+  "name": "agent-schedules",
+  "version": "0.2.0",
+  "description": "Recurring tasks for AI coding agents",
+  "homepage": "https://schedules.sh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jln13x/schedules.git",
+    "directory": "apps/cli"
+  },
+  "bin": {
+    "agent-schedules": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/cli.ts",
+    "build": "bun build src/cli.ts --target node --outfile dist/cli.js",
+    "prepublishOnly": "bun run build",
+    "typecheck": "bun check",
+    "test": "bun test --parallel --randomize"
+  },
+  "devDependencies": {
+    "@agent-schedules/format": "workspace:*",
+    "@clack/prompts": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@types/node": "catalog:",
+    "bun-types": "catalog:",
+    "commander": "catalog:",
+    "effect": "catalog:",
+    "smol-toml": "catalog:"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  "drizzle": false,
+  "vercel": true,
+  "ignore": ["**/drizzle.config.ts"],
+  "ignoreBinaries": ["check"],
+  "workspaces": {
+    "apps/cli": { "entry": ["scripts/*.ts"] },
+    "apps/web": { "entry": ["scripts/*.tsx"] },
+  },
+}
