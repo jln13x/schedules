@@ -6,6 +6,6 @@
   "ignoreBinaries": ["check"],
   "workspaces": {
     "apps/cli": { "entry": ["scripts/*.ts"] },
-    "apps/web": { "entry": ["scripts/*.tsx"] },
+    "apps/web": { "entry": ["scripts/*.{ts,tsx}"] },
   },
 }

@@ -37,6 +37,7 @@
       "dependencies": {
         "@agent-schedules/format": "workspace:*",
         "@base-ui/react": "catalog:",
+        "@effect/ai-typesafe": "catalog:",
         "@hugeicons/core-free-icons": "catalog:",
         "@hugeicons/react": "catalog:",
         "@radix-ui/react-slot": "catalog:",
@@ -56,6 +57,7 @@
         "react-markdown": "catalog:",
         "sonner": "catalog:",
         "stripe": "catalog:",
+        "yaml": "catalog:",
         "zod": "catalog:",
       },
       "devDependencies": {
@@ -91,6 +93,7 @@
     "@base-ui/react": "1.9.0",
     "@changesets/cli": "3.0.3",
     "@clack/prompts": "1.8.1",
+    "@effect/ai-typesafe": "4.1.0",
     "@effect/platform-node": "4.1.0",
     "@electric-sql/pglite": "0.5.10",
     "@hugeicons/core-free-icons": "4.3.5",
@@ -181,6 +184,8 @@
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
+
+    "@effect/ai-typesafe": ["@effect/ai-typesafe@4.1.0", "", { "peerDependencies": { "effect": "^4.1.0" } }, "sha512-NX1Q6yxTiONMv87B5Feip/lvd0HEMnK9cRhka6DUrRKs9YCD8WkCuUp50Plm7WC2s1h5mtFdPtJWqIavqxPJOQ=="],
 
     "@effect/platform-node": ["@effect/platform-node@4.1.0", "", { "dependencies": { "@effect/platform-node-shared": "^4.1.0", "undici": "^8.12.2" }, "peerDependencies": { "effect": "^4.1.0", "redis": ">=5.0.0 <7.0.0" } }, "sha512-v+X7moGVF9k5oMVvz0slA+NgtEod+W+oygeI285MDJgSlUCW3JcqElj+cD3rlijFZtpKhC7RLkU1GuCxjGHTpA=="],
 
