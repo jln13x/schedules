@@ -70,11 +70,14 @@ export const skills = SCHEDULES_SCHEMA.table(
     model: text("model"),
     recurring: doublePrecision("recurring"),
     usefulness: integer("usefulness"),
-    forYou: doublePrecision("for_you"),
+    /** Share of "one run serves the team" against "each person runs it"; for you is one minus it. */
     forTeam: doublePrecision("for_team"),
+    abuse: doublePrecision("abuse"),
     cadence: text("cadence"),
     /** Worst security audit result on skills.sh, or null before any partner audited it. */
     audit: text("audit"),
+    /** Why a skill is kept out of the directory by hand; null means the scores decide. */
+    hidden: text("hidden"),
   },
   (table) => [index().on(table.installs), index().on(table.recurring), index().on(table.fetchedAt)],
 );

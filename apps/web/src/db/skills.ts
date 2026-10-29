@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
+import { ABUSE_THRESHOLD } from "@/lib/schedulable";
 import type { ListedSkill } from "@/lib/skills-sh";
 import { Database } from "./database";
 import { skills } from "./schema";
@@ -95,8 +96,8 @@ export const saveClassification = Effect.fn("saveClassification")(function* (
     model: string;
     recurring: number;
     usefulness: number;
-    forYou: number;
     forTeam: number;
+    abuse: number;
     cadence: string;
     audit: string | null;
   },
@@ -136,7 +137,6 @@ export const rankedSkills = Effect.fn("rankedSkills")(function* ({
         installs: skills.installs,
         recurring: skills.recurring,
         usefulness: skills.usefulness,
-        forYou: skills.forYou,
         forTeam: skills.forTeam,
         cadence: skills.cadence,
         audit: skills.audit,
@@ -147,6 +147,8 @@ export const rankedSkills = Effect.fn("rankedSkills")(function* ({
         and(
           eq(skills.duplicate, false),
           sql`${skills.recurring} >= ${minRecurring}`,
+          sql`${skills.abuse} < ${ABUSE_THRESHOLD}`,
+          isNull(skills.hidden),
           or(isNull(skills.audit), ne(skills.audit, "fail")),
         ),
       )

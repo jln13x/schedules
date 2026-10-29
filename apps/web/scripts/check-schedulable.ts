@@ -3,6 +3,7 @@ import { DecisionModel } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { TypeSafeClient, TypeSafeDecisionModel } from "@effect/ai-typesafe";
 import {
+  ABUSE_THRESHOLD,
   FIT_THRESHOLD,
   JEV_MODEL,
   Schedulable,
@@ -76,6 +77,10 @@ for (const threshold of [0.3, SCHEDULABLE_THRESHOLD, 0.7]) {
     `at ${threshold}${threshold === SCHEDULABLE_THRESHOLD ? " (current)" : ""}: keeps ${count(kept, "yes")}/${good.length} good, ${count(kept, "maybe")} borderline, ${count(kept, "no")} bad`,
   );
 }
+console.log(`\nabuse >= ${ABUSE_THRESHOLD}:`);
+for (const row of rows.filter((row) => row.abuse >= ABUSE_THRESHOLD)) {
+  console.log(`  ${row.abuse.toFixed(2)} ${row.id}`);
+}
 console.log("\nbad skills scored highest:");
 for (const row of bad.slice(0, 5)) {
   console.log(`  ${row.recurring.toFixed(2)} ${row.id}`);
@@ -86,8 +91,8 @@ console.table(
     skill: row.id,
     recurring: row.recurring.toFixed(2),
     useful: row.usefulness,
-    you: row.forYou.toFixed(2),
     team: row.forTeam.toFixed(2),
+    abuse: row.abuse.toFixed(2),
     cadence: row.cadence,
   })),
 );

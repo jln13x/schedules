@@ -28,7 +28,6 @@ const program = Effect.gen(function* () {
       skill: skill.id,
       installs: skill.installs,
       useful: skill.usefulness,
-      you: skill.forYou?.toFixed(2),
       team: skill.forTeam?.toFixed(2),
       cadence: skill.cadence,
       audit: skill.audit ?? "-",

@@ -48,13 +48,21 @@ export const Schedulable = Decision.make({
         },
       ],
     }),
-    forYou: Decision.probability({
+    audience: Decision.classify({
       instructions:
-        "Each person who schedules this for themselves gets a useful result of their own, about their own work, accounts, or interests",
+        "If a whole team used this skill on a schedule, who should run it? Judge by what it acts on: a person's own work, accounts, or interests, versus shared things such as a codebase, its pull requests and issues, infrastructure, or a team channel.",
+      criteria: {
+        each: "Each person runs it for themselves and gets a result of their own",
+        once: "One run serves the whole team; separate runs would duplicate work on shared things",
+      },
     }),
-    forTeam: Decision.probability({
+    abuse: Decision.probability({
       instructions:
-        "This is worth running once for a whole team; if every teammate ran it separately they would duplicate work on shared things such as pull requests, issues, branches, or team channels",
+        "The skill's purpose is to evade detection or rate limits, circumvent a service's rules or terms, impersonate people, generate spam, or otherwise act against the interests of other people or platforms",
+      criteria: {
+        false: "An ordinary tool; any scraping or automation respects the services it touches",
+        true: "Built to get around protections or rules that others rely on",
+      },
     }),
     cadence: Decision.classify({
       instructions: "If it ran on a schedule, how often would running it be most useful?",
@@ -74,18 +82,23 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
   return {
     recurring: answers.recurring.probability,
     usefulness: Math.round((100 * answers.usefulness.rating) / levels),
-    forYou: answers.forYou.probability,
-    forTeam: answers.forTeam.probability,
+    forTeam: answers.audience.probabilities.once,
+    abuse: answers.abuse.probability,
     cadence: answers.cadence.label,
   };
 }
 
-/** A fit counts toward the directory's "for you" and "for your team" filters at this probability. */
-export const FIT_THRESHOLD = 0.5;
-
-/** On the labelled set, 0.5 keeps 19 or 20 of 22 good skills and one or two of 91 bad ones; answers vary slightly between runs. */
+/** On the labelled set, 0.5 keeps 19 or 20 of 22 good skills and one or two of 91 bad ones. */
 export const SCHEDULABLE_THRESHOLD = 0.5;
 
+/**
+ * A skill shows under "for you" when the team share is at most this, and under "for your team" when
+ * it is at least one minus this, so a skill that works both ways appears in both.
+ */
+export const FIT_THRESHOLD = 0.4;
+
+/** Skills at or above this are kept out of the directory however well they would schedule. */
+export const ABUSE_THRESHOLD = 0.5;
 /** Enough of a skill's instructions to judge it; the rest is detail that costs tokens. */
 const INSTRUCTIONS_LIMIT = 6000;
 
