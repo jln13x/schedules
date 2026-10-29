@@ -1,17 +1,17 @@
 import { notFound } from "next/navigation";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
+import { FitBadges } from "@/components/fit-badges";
+import { Hint } from "@/components/hint";
 import { JsonLd } from "@/components/json-ld";
 import { formatWhen, REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/db/format";
 import { SkillCommands } from "@/components/skill-commands";
-import { CADENCES, FITS } from "@/lib/cadence";
+import { CADENCES } from "@/lib/cadence";
 import { compactNumber, githubUrl, pageMetadata, SITE, skillPath, skillsShUrl } from "@/lib/site";
 import { cachedSkill } from "@/server/cached";
 
 interface SkillPageProps {
   params: Promise<{ owner: string; repo: string; skill: string }>;
 }
-
-const AUDIT_LABELS = { pass: "Passed", warn: "Passed with warnings" } as const;
 
 export async function generateMetadata({ params }: SkillPageProps) {
   const { owner, repo, slug } = validParams(await params);
@@ -37,7 +37,6 @@ export default async function SkillPage({ params }: SkillPageProps) {
   }
 
   const cadence = CADENCES[skill.cadence];
-  const fits = (Object.keys(FITS) as Array<keyof typeof FITS>).filter((fit) => skill.fits[fit]);
   return (
     <>
       <JsonLd
@@ -70,92 +69,51 @@ export default async function SkillPage({ params }: SkillPageProps) {
       <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
         Run {skill.name} on a schedule
       </h1>
+      <div className="mt-4">
+        <FitBadges fits={skill.fits} hint />
+      </div>
       {skill.description && (
         <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-7">
           {skill.description}
         </p>
       )}
-      <p className="text-muted-foreground mt-3 flex items-center gap-1.5 text-sm">
-        Suggested: {formatWhen(cadence.cron)}
-        <span className="group relative inline-flex">
-          <button
-            type="button"
-            aria-label={`Cron ${cadence.cron}, local time`}
-            className="hover:text-foreground focus-visible:text-foreground focus-visible:ring-ring rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-3.5"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4" />
-              <path d="M12 8h.01" />
-            </svg>
-          </button>
-          <span
-            aria-hidden="true"
-            className="border-border bg-popover text-foreground pointer-events-none absolute top-full left-1/2 z-10 mt-2 -translate-x-1/2 rounded-md border px-2 py-1 font-mono text-xs whitespace-nowrap opacity-0 shadow-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
-          >
-            {cadence.cron} - local time
-          </span>
+      <p className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-muted-foreground font-mono text-xs tracking-wider">SUGGESTED</span>
+        <span className="text-xl font-semibold tracking-tight sm:text-2xl">
+          {formatWhen(cadence.cron)}
+        </span>
+        <span className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs">
+          {cadence.cron}
+          <Hint label={`Cron ${cadence.cron}, local time`}>
+            Cron expression, in your local time. Change it in the command below.
+          </Hint>
         </span>
       </p>
-      <div className="mt-14 grid gap-12 md:grid-cols-[minmax(0,1fr)_200px] md:gap-16">
+      <div className="mt-12 grid gap-12 md:grid-cols-[minmax(0,1fr)_200px] md:gap-16">
         <div className="min-w-0">
           <SkillCommands skill={skill} cron={cadence.cron} />
-          <section className="mt-12">
-            <h2 className="border-border text-muted-foreground mb-3 border-b pb-4 text-sm font-medium">
-              Why schedule it
-            </h2>
-            <p className="text-sm leading-7">
-              {fits.length === 2
-                ? "It works both ways: each person can run it for their own work, or one run can serve the whole team."
-                : fits[0] === "team"
-                  ? "One run serves the whole team. If everyone scheduled it separately, the runs would repeat the same work on shared things."
-                  : fits[0] === "you"
-                    ? "Each person who schedules it gets a result of their own, about their own work and accounts."
-                    : "It does useful work on a timer, though whether one person or the whole team should run it depends on how you point it."}{" "}
-              The full instructions are on{" "}
-              <a
-                href={skillsShUrl(skill)}
-                className="underline decoration-dotted underline-offset-4"
-              >
-                skills.sh
-              </a>{" "}
-              and in the{" "}
-              <a href={githubUrl(skill)} className="underline decoration-dotted underline-offset-4">
-                source repository
-              </a>
-              .
-            </p>
-          </section>
+          <p className="text-muted-foreground mt-6 text-sm">
+            Read the skill on{" "}
+            <a href={skillsShUrl(skill)} className="underline decoration-dotted underline-offset-4">
+              skills.sh
+            </a>{" "}
+            or in the{" "}
+            <a href={githubUrl(skill)} className="underline decoration-dotted underline-offset-4">
+              source repository
+            </a>{" "}
+            before scheduling it.
+          </p>
         </div>
         <aside
           aria-label="Skill details"
           className="flex flex-wrap gap-x-12 gap-y-9 md:flex-col md:gap-12"
         >
           <div>
-            <h2 className="text-sm font-medium">Worth scheduling</h2>
-            <p className="mt-3 font-mono text-3xl font-semibold">
-              {skill.usefulness}
-              <span className="text-muted-foreground text-base font-normal">/100</span>
-            </p>
-          </div>
-          <div>
-            <h2 className="text-sm font-medium">Who runs it</h2>
-            <p className="text-muted-foreground mt-3 text-sm">
-              {fits.length > 0 ? fits.map((fit) => FITS[fit].label).join(" and ") : "Either"}
-            </p>
-          </div>
-          <div>
-            <h2 className="text-sm font-medium">Installs on skills.sh</h2>
-            <p className="mt-3 font-mono text-xl font-semibold">{compactNumber(skill.installs)}</p>
+            <h2 className="flex items-center gap-1.5 text-sm font-medium">
+              Installs
+              <Hint label="Install counts come from skills.sh">Counted by skills.sh</Hint>
+            </h2>
+            <p className="mt-3 font-mono text-3xl font-semibold">{compactNumber(skill.installs)}</p>
           </div>
           <div>
             <h2 className="text-sm font-medium">Author</h2>
@@ -165,22 +123,6 @@ export default async function SkillPage({ params }: SkillPageProps) {
             >
               {owner}
             </a>
-          </div>
-          <div>
-            <h2 className="text-sm font-medium">Security audit</h2>
-            <p className="text-muted-foreground mt-3 text-xs">
-              {skill.audit === "pass" || skill.audit === "warn"
-                ? AUDIT_LABELS[skill.audit]
-                : "Not audited yet"}
-              {skill.audit && (
-                <>
-                  {" "}
-                  <a href={skillsShUrl(skill)} className="underline decoration-dotted">
-                    on skills.sh
-                  </a>
-                </>
-              )}
-            </p>
           </div>
           <div>
             <h2 className="text-sm font-medium">First seen</h2>

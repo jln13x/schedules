@@ -73,9 +73,7 @@ export function SkillCommands({
           />
         </li>
       </ol>
-      <p className="text-muted-foreground mt-3 text-xs">
-        Read the skill before scheduling it. Runs use your agent and your accounts.
-      </p>
+      <p className="text-muted-foreground mt-3 text-xs">Runs use your agent and your accounts.</p>
     </section>
   );
 }

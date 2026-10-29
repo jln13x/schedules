@@ -63,7 +63,9 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     expect(markup).toContain("Run daily on a schedule");
     expect(markup).toContain("npx skills add acme/tools --skill daily");
     expect(markup).toContain("agent-schedules schedule daily &quot;0 9 * * 1-5&quot;");
-    expect(markup).toContain("One run serves the whole team");
+    expect(markup).toContain("For your team");
+    expect(markup).not.toContain("For you<");
+    expect(markup).toContain("Weekdays 09:00");
     expect(markup).toContain("https://github.com/acme/tools");
     expect(markup).toContain("https://skills.sh/acme/tools/daily");
     expect(markup).not.toContain("<img");

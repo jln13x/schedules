@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { debounce, defaultRateLimit, useQueryState } from "nuqs";
 import { useTransition } from "react";
+import { FitBadges } from "@/components/fit-badges";
+import { Hint } from "@/components/hint";
 import { CADENCES, type Fit, FITS } from "@/lib/cadence";
 import { SKILLS_PARAMS } from "@/lib/search-params";
 import { compactNumber, skillPath } from "@/lib/site";
@@ -97,8 +99,13 @@ function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorE
           <tr>
             <th className="w-12 py-4 font-normal">#</th>
             <th className="py-4 font-normal">SKILL</th>
-            <th className="hidden w-40 py-4 font-normal md:table-cell">RUN</th>
-            <th className="py-4 text-right font-normal">INSTALLS</th>
+            <th className="hidden w-40 py-4 font-normal md:table-cell">RUNS</th>
+            <th className="py-4 text-right font-normal">
+              <span className="inline-flex items-center gap-1.5">
+                INSTALLS
+                <Hint label="Install counts come from skills.sh">Counted by skills.sh</Hint>
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -119,17 +126,13 @@ function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorE
                   <span className="text-muted-foreground font-mono text-xs">
                     {skill.owner}/{skill.repo}
                   </span>
+                  <span className="relative z-10">
+                    <FitBadges fits={skill.fits} />
+                  </span>
                 </div>
               </td>
               <td className="text-muted-foreground hidden py-5 pr-8 font-mono text-xs md:table-cell">
                 {CADENCES[skill.cadence].label}
-                {skill.fits.you && skill.fits.team
-                  ? ""
-                  : skill.fits.team
-                    ? ", once for the team"
-                    : skill.fits.you
-                      ? ", for each person"
-                      : ""}
               </td>
               <td className="py-5 text-right font-mono tabular-nums">
                 {compactNumber(skill.installs)}
