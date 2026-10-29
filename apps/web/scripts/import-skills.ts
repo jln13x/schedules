@@ -3,7 +3,6 @@ import { Effect, Layer } from "effect";
 import { Database } from "../src/db/database";
 import { rankedSkills } from "../src/db/skills";
 import { JevLayer } from "../src/lib/jev";
-import { SCHEDULABLE_THRESHOLD } from "../src/lib/schedulable";
 import { importSkills } from "../src/lib/skill-import";
 import { SkillsSh } from "../src/lib/skills-sh";
 
@@ -22,7 +21,7 @@ const program = Effect.gen(function* () {
     budget: Number(values.budget),
   });
   console.log(summary);
-  const ranked = yield* rankedSkills({ minRecurring: SCHEDULABLE_THRESHOLD, limit: 30 });
+  const ranked = yield* rankedSkills({ limit: 30 });
   console.table(
     ranked.map((skill) => ({
       skill: skill.id,
@@ -30,6 +29,7 @@ const program = Effect.gen(function* () {
       useful: skill.usefulness,
       team: skill.forTeam?.toFixed(2),
       cadence: skill.cadence,
+      time: skill.time,
       audit: skill.audit ?? "-",
     })),
   );

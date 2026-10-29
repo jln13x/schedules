@@ -68,8 +68,8 @@ npx agent-schedules push <harness>`}</code>
       <>
         <H2>search</H2>
         <p>
-          Use the <code>search</code> command to find schedules listed on schedules.sh. Results are
-          sorted by installs and show the <code>owner/repo/name</code> to pass to <code>add</code>.
+          Use the <code>search</code> command to find skills listed on schedules.sh, best first,
+          with their install counts from skills.sh.
         </p>
         <pre>
           <code>{`npx agent-schedules search review`}</code>
@@ -294,15 +294,14 @@ Options:
             and logs are kept.
           </li>
           <li>
-            <code>DO_NOT_TRACK=1</code>: see below.
+            <code>DO_NOT_TRACK=1</code>: see Telemetry below.
           </li>
         </ul>
         <H2>Telemetry</H2>
         <p>
-          When <code>add</code> writes a schedule from a public repository, it sends that
-          schedule&apos;s <code>owner/repo/name</code> to schedules.sh, which records the install
-          and its time, nothing about you. Unchanged files and <code>--dry-run</code> send nothing.
-          Set <code>DO_NOT_TRACK=1</code> to opt out.
+          The CLI sends nothing about you. Older versions reported each <code>add</code> from a
+          public repository to schedules.sh; that endpoint is gone and the report, if sent, is
+          dropped. <code>DO_NOT_TRACK=1</code> still turns the report off in those versions.
         </p>
       </>
     ),
@@ -546,19 +545,25 @@ Review the repository for dependency updates.`}</code>
           <code>npx agent-schedules push &lt;harness&gt;</code> to register your schedules with your
           harness. Run it again after editing a schedule to update the registered task.
         </p>
-        <H2>Are GitHub installs anonymous?</H2>
+        <H2>Where do the listed skills come from?</H2>
         <p>
-          Yes. An install records which schedule was added and when, nothing about you. Set{" "}
-          <code>DO_NOT_TRACK=1</code> to opt out.
+          From <a href="https://skills.sh">skills.sh</a>, the directory of agent skills. Every day
+          schedules.sh reads the most installed skills there and asks a decision model which of them
+          do useful work on a timer, who should run them, and how often. Skills that pass are listed
+          with their install counts from skills.sh; forks and skills that failed a security audit
+          there are left out. To get a skill listed, publish it as a skill on GitHub and let it be
+          installed through skills.sh. Nothing is submitted here.
         </p>
-        <H2>How do schedules get listed and ranked?</H2>
+        <H2>How are skills ranked?</H2>
         <p>
-          Put files under <code>.agents/schedules/</code> in a public GitHub repository and{" "}
-          <a href="/submit">submit it</a>. Each file is named after its schedule, so{" "}
-          <code>Daily review</code> lives in <code>daily-review.md</code>; a file named otherwise is
-          skipped. Listed repositories are re-read from GitHub daily; a renamed repository moves to
-          its new name with its installs, and its old links keep working. All time ranks by total
-          installs, Trending by installs in the last seven days.
+          By how much is gained from scheduling them, weighted by how many people installed them.
+          &quot;For you&quot; shows skills each person runs for their own work; &quot;For your
+          team&quot; shows skills one run serves everyone with. A skill that works both ways is in
+          both.
+        </p>
+        <H2>Does schedules.sh record installs?</H2>
+        <p>
+          No. Install counts come from skills.sh. Nothing on this site records what you add or run.
         </p>
         <H2>Will pushing to two harnesses run a task twice?</H2>
         <p>Yes. Each harness you push to runs its own copy, so push to one.</p>

@@ -22,7 +22,13 @@ function subscribe(onChange: () => void) {
   };
 }
 
-export function InstallCommand({ source }: { source: string }) {
+export function SkillCommands({
+  skill,
+  cron,
+}: {
+  skill: { owner: string; repo: string; slug: string };
+  cron: string;
+}) {
   const saved = useSyncExternalStore(
     subscribe,
     () => localStorage.getItem(STORAGE_KEY),
@@ -32,7 +38,7 @@ export function InstallCommand({ source }: { source: string }) {
   return (
     <section>
       <div className="border-border mb-4 flex items-center justify-between gap-4 border-b pb-3">
-        <h2 className="font-mono text-xs tracking-wider">INSTALLATION</h2>
+        <h2 className="font-mono text-xs tracking-wider">RUN IT ON A SCHEDULE</h2>
         <div role="tablist" aria-label="Package manager" className="flex gap-4 font-mono text-xs">
           {RUNNERS.map(({ value }) => (
             <button
@@ -51,10 +57,23 @@ export function InstallCommand({ source }: { source: string }) {
           ))}
         </div>
       </div>
-      <CopyCommand key={runner} command={`${command} agent-schedules add ${source}`} />
-      <p className="text-muted-foreground mt-3 text-xs">
-        Review the prompt before pushing. Schedules run using your agent and accounts.
-      </p>
+      <ol className="grid gap-4">
+        <li className="grid gap-2">
+          <p className="text-muted-foreground text-xs">1. Install the skill from skills.sh</p>
+          <CopyCommand
+            key={`install-${runner}`}
+            command={`${command} skills add ${skill.owner}/${skill.repo} --skill ${skill.slug}`}
+          />
+        </li>
+        <li className="grid gap-2">
+          <p className="text-muted-foreground text-xs">2. Schedule it, then push to your agent</p>
+          <CopyCommand
+            key={`schedule-${runner}`}
+            command={`${command} agent-schedules schedule ${skill.slug} "${cron}"`}
+          />
+        </li>
+      </ol>
+      <p className="text-muted-foreground mt-3 text-xs">Runs use your agent and your accounts.</p>
     </section>
   );
 }

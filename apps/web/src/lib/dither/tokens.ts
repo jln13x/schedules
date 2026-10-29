@@ -17,7 +17,7 @@ const DITHER_COLOR_NAMES = [
   "grey",
 ] as const;
 
-export type DitherColorName = (typeof DITHER_COLOR_NAMES)[number];
+type DitherColorName = (typeof DITHER_COLOR_NAMES)[number];
 
 /**
  * Used when a named colour's variable is missing, as in a stylesheet from
@@ -75,14 +75,3 @@ export const cssColor = (value: DitherColor): string => {
   }
   return value.startsWith("--") ? `var(${value})` : value;
 };
-
-/**
- * Motion tokens shared by every component: one ease-out curve and three
- * durations in milliseconds. `ease` matches the site's `--ease-out`.
- */
-export const MOTION = {
-  base: 240,
-  ease: "cubic-bezier(0.23, 1, 0.32, 1)",
-  fast: 150,
-  slow: 600,
-} as const;

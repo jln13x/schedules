@@ -1,39 +1,40 @@
 import { cacheLife, cacheTag } from "next/cache";
-import { getShowcaseSchedules } from "@/components/showcase/showcase-schedules";
-import { getLeaderboard, getRepository, getSchedule, getSponsors } from "@/db";
+import { getShowcaseSkills } from "@/components/showcase/showcase-skills";
+import { getSponsors } from "@/db";
+import { getSkill, listedSkillPaths, rankedSkills, type SkillQuery } from "@/db/skills";
 import { run } from "./runtime";
 
-/** Everything read from the schedules and installs tables. Refreshed when a listing changes. */
-export const SCHEDULES_TAG = "schedules";
+/** Everything read from the skills table. Refreshed after each import. */
+export const SKILLS_TAG = "skills";
 /** The live sponsor row. Refreshed when Stripe reports a change. */
 export const SPONSORS_TAG = "sponsors";
 
-export async function cachedLeaderboard(options: Parameters<typeof getLeaderboard>[0] = {}) {
+export async function cachedSkills(options: SkillQuery = {}) {
   "use cache";
-  cacheTag(SCHEDULES_TAG);
+  cacheTag(SKILLS_TAG);
   cacheLife("minutes");
-  return run(getLeaderboard(options));
+  return run(rankedSkills(options));
 }
 
-export async function cachedRepository(owner: string, repo: string) {
+export async function cachedSkill(owner: string, repo: string, slug: string) {
   "use cache";
-  cacheTag(SCHEDULES_TAG);
+  cacheTag(SKILLS_TAG);
   cacheLife("minutes");
-  return run(getRepository(owner, repo));
+  return run(getSkill(owner, repo, slug));
 }
 
-export async function cachedSchedule(owner: string, repo: string, name: string) {
+export async function cachedSkillPaths() {
   "use cache";
-  cacheTag(SCHEDULES_TAG);
-  cacheLife("minutes");
-  return run(getSchedule(owner, repo, name));
+  cacheTag(SKILLS_TAG);
+  cacheLife("hours");
+  return run(listedSkillPaths());
 }
 
 export async function cachedShowcase() {
   "use cache";
-  cacheTag(SCHEDULES_TAG);
+  cacheTag(SKILLS_TAG);
   cacheLife("hours");
-  return run(getShowcaseSchedules());
+  return run(getShowcaseSkills());
 }
 
 export async function cachedSponsors() {

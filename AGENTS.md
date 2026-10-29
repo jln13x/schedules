@@ -5,7 +5,7 @@ Schedules are recurring prompts for coding agents, kept as Markdown files in a r
 ## Layout
 
 - `apps/cli`: the npm package `agent-schedules`. `src/cli.ts` wires the commands; `src/harness.ts` defines what a harness provides; `src/harnesses/` has one file per harness, named after it. The apps (t3, codex-desktop, claude-desktop) schedule tasks themselves; the command-line agents (codex, claude-code, pi, opencode, cursor-agent) only say how their CLI is started, and `harnesses/cron/` schedules and runs them with cron. `scripts/` holds the sandbox checks.
-- `apps/web`: schedules.sh, Next.js with Drizzle on Postgres, deployed on Vercel. Server code is Effect programs over the services in `src/db` and `src/lib`, run at pages, route handlers, and actions through `src/server/runtime.ts`; pages read through the `"use cache"` loaders in `src/server/cached.ts`, and a mutation revalidates their tag. Tests build their own runtime from `src/server/testing.ts`. UI primitives come from shadcn on Base UI (`components.json`, `src/components/ui`); `scripts/render-brand.tsx` regenerates the logo SVGs. `src/lib/docs.tsx` is the public documentation.
+- `apps/web`: schedules.sh, Next.js with Drizzle on Postgres, deployed on Vercel. Listings are skills read hourly from skills.sh and judged by Jev (`src/lib/schedulable.ts`, `src/lib/skill-import.ts`); nothing is submitted on the site. Server code is Effect programs over the services in `src/db` and `src/lib`, run at pages, route handlers, and actions through `src/server/runtime.ts`; pages read through the `"use cache"` loaders in `src/server/cached.ts`, and a mutation revalidates their tag. Tests build their own runtime from `src/server/testing.ts`. UI primitives come from shadcn on Base UI (`components.json`, `src/components/ui`); `scripts/render-brand.tsx` regenerates the logo SVGs. `src/lib/docs.tsx` is the public documentation.
 - `packages/format`: parses and writes the schedule file format; shared by both apps.
 - `.agents/skills/verify-harness`: the verification skill, its check list, and the Docker sandbox that runs the newest agent releases.
 
@@ -19,7 +19,7 @@ Schedules are recurring prompts for coding agents, kept as Markdown files in a r
 
 ## Constraints
 
-- Installs and forms never record personal data; Discord notifications carry none. `DO_NOT_TRACK=1` skips counting.
+- The site records nothing about who installs or schedules a skill; forms never record personal data, and Discord notifications carry none.
 - The sponsor price lives only in Stripe, never in the UI. The sponsored row stays out of organic ranking, the search API, and `llms.txt`.
 - Secrets come in through hidden-input wizards and `stdin`, never through chat, argv, or committed files.
 - Verification work uses only `verify-*` schedules in a throwaway repository and never `--access full`.

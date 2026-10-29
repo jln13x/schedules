@@ -2,7 +2,7 @@ import { z } from "zod";
 import { IDENTITY_LIMITS } from "@/db/format";
 
 export const REPORT_REASONS = {
-  dangerous: "Dangerous or malicious prompt",
+  dangerous: "Dangerous or malicious skill",
   misleading: "Spam or misleading",
   broken: "Broken or does not work",
   takedown: "Copyright or removal request",

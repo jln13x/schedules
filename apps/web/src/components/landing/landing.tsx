@@ -1,19 +1,17 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { DitherButton } from "@/components/dithercn/dither-button";
 import { Showcase } from "@/components/showcase/showcase";
-import type { ShowcaseSchedule } from "@/components/showcase/showcase-schedules";
+import type { ShowcaseSkill } from "@/components/showcase/showcase-skills";
 import { HeroActions, Label, WorksWith } from "./parts";
 
-const PITCH = "Recurring tasks for AI coding agents";
+const PITCH = "Agent skills worth running on a schedule";
 
 export function Landing({
   showcase,
-  leaderboard,
+  skills,
 }: {
-  showcase: ReadonlyArray<ShowcaseSchedule>;
-  /** Rendered per request, since it follows the URL's search and period. */
-  leaderboard: ReactNode;
+  showcase: ReadonlyArray<ShowcaseSkill>;
+  /** Rendered per request, since it follows the URL's search and filter. */
+  skills: ReactNode;
 }) {
   return (
     <>
@@ -33,16 +31,11 @@ export function Landing({
           <HeroActions className="mt-6 sm:mt-8" />
           <WorksWith className="mt-8 sm:mt-10" />
         </div>
-        <Showcase schedules={showcase} />
+        <Showcase skills={showcase} />
       </section>
-      <section id="schedules" className="mt-14 scroll-mt-6 sm:mt-20">
-        <div className="flex items-center justify-between gap-4">
-          <Label>SCHEDULES LEADERBOARD</Label>
-          <DitherButton asChild size="sm" variant="outline">
-            <Link href="/submit">Submit a schedule</Link>
-          </DitherButton>
-        </div>
-        {leaderboard}
+      <section id="skills" className="mt-14 scroll-mt-6 sm:mt-20">
+        <Label>SKILLS TO SCHEDULE</Label>
+        {skills}
       </section>
     </>
   );

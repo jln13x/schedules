@@ -2,7 +2,6 @@ import { type Effect, Layer, ManagedRuntime } from "effect";
 import type { DecisionModel } from "effect/ai";
 import { Database } from "@/db/database";
 import { Discord } from "@/lib/discord";
-import { GitHub } from "@/lib/github";
 import { JevLayer } from "@/lib/jev";
 import { RateLimit } from "@/lib/rate-limit";
 import { SkillsSh } from "@/lib/skills-sh";
@@ -10,7 +9,6 @@ import { Billing } from "@/lib/stripe";
 
 export type Services =
   | Database
-  | GitHub
   | RateLimit
   | Discord
   | Billing
@@ -19,7 +17,6 @@ export type Services =
 
 const AppLayer = Layer.mergeAll(
   Database.layer,
-  GitHub.layer,
   RateLimit.layer,
   Discord.layer,
   Billing.layer,
