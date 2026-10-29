@@ -42,6 +42,8 @@ export const skills = SCHEDULES_SCHEMA.table(
     forTeam: doublePrecision("for_team"),
     abuse: doublePrecision("abuse"),
     cadence: text("cadence"),
+    /** morning, midday, or evening; with the cadence it gives the suggested cron. */
+    time: text("time"),
     /** Worst security audit result on skills.sh, or null before any partner audited it. */
     audit: text("audit"),
     /** Why a skill is kept out of the directory by hand; null means the scores decide. */

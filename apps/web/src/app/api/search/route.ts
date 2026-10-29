@@ -32,7 +32,7 @@ export async function GET(request: Request) {
           description: skill.description,
           installs: skill.installs,
           usefulness: skill.usefulness,
-          cadence: skill.cadence,
+          schedule: { cron: skill.schedule.cron, label: skill.schedule.label },
           fits: skill.fits,
           url: `${SITE.origin}${skillPath(skill)}`,
         })),

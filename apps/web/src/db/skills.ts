@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { type Fit, isCadence } from "@/lib/cadence";
+import { type Fit, isCadence, isTimeOfDay, suggestedSchedule } from "@/lib/cadence";
 import { ABUSE_THRESHOLD, FIT_THRESHOLD, SCHEDULABLE_THRESHOLD } from "@/lib/schedulable";
 import type { ListedSkill } from "@/lib/skills-sh";
 import { Database } from "./database";
@@ -100,6 +100,7 @@ export const saveClassification = Effect.fn("saveClassification")(function* (
     forTeam: number;
     abuse: number;
     cadence: string;
+    time: string;
     audit: string | null;
   },
 ) {
@@ -137,6 +138,7 @@ const LISTING_COLUMNS = {
   usefulness: skills.usefulness,
   forTeam: skills.forTeam,
   cadence: skills.cadence,
+  time: skills.time,
   audit: skills.audit,
   firstSeenAt: skills.firstSeenAt,
 };
@@ -153,7 +155,10 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 export function listingOf(row: Effect.Success<ReturnType<typeof rankedSkills>>[number]) {
   return {
     ...row,
-    cadence: isCadence(row.cadence) ? row.cadence : "weekly",
+    schedule: suggestedSchedule(
+      isCadence(row.cadence) ? row.cadence : "weekly",
+      isTimeOfDay(row.time) ? row.time : "morning",
+    ),
     usefulness: row.usefulness ?? 0,
     fits: {
       you: (row.forTeam ?? 0) <= 1 - FIT_THRESHOLD,

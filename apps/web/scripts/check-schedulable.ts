@@ -94,5 +94,6 @@ console.table(
     team: row.forTeam.toFixed(2),
     abuse: row.abuse.toFixed(2),
     cadence: row.cadence,
+    time: row.time,
   })),
 );

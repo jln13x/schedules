@@ -39,7 +39,12 @@ const FakeJev = Layer.effect(
             cadence: {
               _tag: "Classify",
               label: "weekdays",
-              probabilities: { daily: 0, weekdays: 1, weekly: 0, monthly: 0 },
+              probabilities: { daily: 0, weekdays: 1, weekly: 0 },
+            },
+            time: {
+              _tag: "Classify",
+              label: "morning",
+              probabilities: { morning: 1, midday: 0, evening: 0 },
             },
           },
           usage: { inputTokens: 100, outputTokens: 0 },
@@ -128,6 +133,7 @@ DATABASE_TEST(
           usefulness: 67,
           forTeam: 0.2,
           cadence: "weekdays",
+          time: "morning",
           audit: "warn",
         },
       ]);

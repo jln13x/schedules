@@ -5,7 +5,7 @@ import { debounce, defaultRateLimit, useQueryState } from "nuqs";
 import { useTransition } from "react";
 import { FitBadges } from "@/components/fit-badges";
 import { Hint } from "@/components/hint";
-import { CADENCES, type Fit, FITS } from "@/lib/cadence";
+import { type Fit, FITS, type SuggestedSchedule } from "@/lib/cadence";
 import { SKILLS_PARAMS } from "@/lib/search-params";
 import { compactNumber, skillPath } from "@/lib/site";
 import { type SponsorEntry, SponsorRow } from "@/components/sponsor-row";
@@ -18,7 +18,7 @@ export interface SkillEntry {
   name: string;
   installs: number;
   usefulness: number;
-  cadence: keyof typeof CADENCES;
+  schedule: SuggestedSchedule;
   fits: Record<Fit, boolean>;
 }
 
@@ -60,7 +60,7 @@ export function SkillList({
         {(
           [
             ["all", "All"],
-            ...Object.entries(FITS).map(([value, { label }]) => [value, label]),
+            ...Object.entries(FITS).map(([value, { filter }]) => [value, filter]),
           ] as const
         ).map(([value, label]) => (
           <button
@@ -99,11 +99,13 @@ function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorE
           <tr>
             <th className="w-12 py-4 font-normal">#</th>
             <th className="py-4 font-normal">SKILL</th>
-            <th className="hidden w-40 py-4 font-normal md:table-cell">RUNS</th>
+            <th className="hidden w-48 py-4 font-normal md:table-cell">SUGGESTED</th>
             <th className="py-4 text-right font-normal">
               <span className="inline-flex items-center gap-1.5">
                 INSTALLS
-                <Hint label="Install counts come from skills.sh">Counted by skills.sh</Hint>
+                <Hint label="Install counts come from skills.sh" align="end">
+                  Counted by skills.sh
+                </Hint>
               </span>
             </th>
           </tr>
@@ -132,7 +134,7 @@ function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorE
                 </div>
               </td>
               <td className="text-muted-foreground hidden py-5 pr-8 font-mono text-xs md:table-cell">
-                {CADENCES[skill.cadence].label}
+                {skill.schedule.label}
               </td>
               <td className="py-5 text-right font-mono tabular-nums">
                 {compactNumber(skill.installs)}

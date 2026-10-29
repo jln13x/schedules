@@ -52,7 +52,7 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     session.payment_status = "paid";
     expect(await renderStatus("cs_test_fixture12345")).toContain("Thanks for supporting schedules.sh");
 
-    const skill = { id: "acme/tools/daily", owner: "acme", repo: "tools", slug: "daily", name: "daily", description: "Review the repository <img src=x onerror=alert(1)>", installs: 1200, usefulness: 67, forTeam: 0.95, cadence: "weekdays", audit: "pass", firstSeenAt: new Date(), score: 1, fits: { you: false, team: true } };
+    const skill = { id: "acme/tools/daily", owner: "acme", repo: "tools", slug: "daily", name: "daily", description: "Review the repository <img src=x onerror=alert(1)>", installs: 1200, usefulness: 67, forTeam: 0.95, cadence: "weekdays", time: "morning", schedule: { cron: "0 8 * * 1-5", hour: 8, weekdays: [1, 2, 3, 4, 5], label: "Every weekday at 08:00", days: "Every weekday", time: "08:00" }, audit: "pass", firstSeenAt: new Date(), score: 1, fits: { you: false, team: true } };
     let found = skill;
     mock.module("@/server/cached", () => ({ SKILLS_TAG: "skills", cachedSkill: async () => found }));
     mock.module("next/cache", () => ({ updateTag() {} }));
@@ -62,10 +62,11 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     const markup = await render({ owner: "acme", repo: "tools", skill: "daily" });
     expect(markup).toContain("Run daily on a schedule");
     expect(markup).toContain("npx skills add acme/tools --skill daily");
-    expect(markup).toContain("agent-schedules schedule daily &quot;0 9 * * 1-5&quot;");
-    expect(markup).toContain("For your team");
-    expect(markup).not.toContain("For you<");
-    expect(markup).toContain("Weekdays 09:00");
+    expect(markup).toContain("agent-schedules schedule daily &quot;0 8 * * 1-5&quot;");
+    expect(markup).toContain(">Team<");
+    expect(markup).not.toContain(">You<");
+    expect(markup).toContain("08:00");
+    expect(markup).toContain("Every weekday");
     expect(markup).toContain("https://github.com/acme/tools");
     expect(markup).toContain("https://skills.sh/acme/tools/daily");
     expect(markup).not.toContain("<img");

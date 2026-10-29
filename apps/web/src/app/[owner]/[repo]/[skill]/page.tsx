@@ -3,9 +3,9 @@ import { FeedbackDialog } from "@/components/feedback/feedback-dialog";
 import { FitBadges } from "@/components/fit-badges";
 import { Hint } from "@/components/hint";
 import { JsonLd } from "@/components/json-ld";
-import { formatWhen, REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/db/format";
+import { REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/db/format";
 import { SkillCommands } from "@/components/skill-commands";
-import { CADENCES } from "@/lib/cadence";
+import { SuggestedSchedule } from "@/components/suggested-schedule";
 import { compactNumber, githubUrl, pageMetadata, SITE, skillPath, skillsShUrl } from "@/lib/site";
 import { cachedSkill } from "@/server/cached";
 
@@ -36,7 +36,6 @@ export default async function SkillPage({ params }: SkillPageProps) {
     notFound();
   }
 
-  const cadence = CADENCES[skill.cadence];
   return (
     <>
       <JsonLd
@@ -70,28 +69,19 @@ export default async function SkillPage({ params }: SkillPageProps) {
         Run {skill.name} on a schedule
       </h1>
       <div className="mt-4">
-        <FitBadges fits={skill.fits} hint />
+        <FitBadges fits={skill.fits} />
       </div>
       {skill.description && (
         <p className="text-muted-foreground mt-4 max-w-2xl text-base leading-7">
           {skill.description}
         </p>
       )}
-      <p className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-muted-foreground font-mono text-xs tracking-wider">SUGGESTED</span>
-        <span className="text-xl font-semibold tracking-tight sm:text-2xl">
-          {formatWhen(cadence.cron)}
-        </span>
-        <span className="text-muted-foreground inline-flex items-center gap-1.5 font-mono text-xs">
-          {cadence.cron}
-          <Hint label={`Cron ${cadence.cron}, local time`}>
-            Cron expression, in your local time. Change it in the command below.
-          </Hint>
-        </span>
-      </p>
+      <div className="mt-8 max-w-xl">
+        <SuggestedSchedule schedule={skill.schedule} />
+      </div>
       <div className="mt-12 grid gap-12 md:grid-cols-[minmax(0,1fr)_200px] md:gap-16">
         <div className="min-w-0">
-          <SkillCommands skill={skill} cron={cadence.cron} />
+          <SkillCommands skill={skill} cron={skill.schedule.cron} />
           <p className="text-muted-foreground mt-6 text-sm">
             Read the skill on{" "}
             <a href={skillsShUrl(skill)} className="underline decoration-dotted underline-offset-4">

@@ -15,7 +15,7 @@ export const SCHEDULE_SLUG = z
   .max(IDENTITY_LIMITS.scheduleSlug)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Expected a lowercase schedule slug");
 
-export function scheduleTiming(cron: string) {
+function scheduleTiming(cron: string) {
   const timing = timingFromCron(cron);
 
   if (typeof timing === "string") {

@@ -29,6 +29,7 @@ const program = Effect.gen(function* () {
       useful: skill.usefulness,
       team: skill.forTeam?.toFixed(2),
       cadence: skill.cadence,
+      time: skill.time,
       audit: skill.audit ?? "-",
     })),
   );

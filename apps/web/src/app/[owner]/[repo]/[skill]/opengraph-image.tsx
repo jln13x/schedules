@@ -1,4 +1,4 @@
-import { CADENCES } from "@/lib/cadence";
+import { suggestedSchedule } from "@/lib/cadence";
 import { OG_CONTENT_TYPE, OG_SIZE, ogImage } from "@/lib/og";
 import { cachedSkill } from "@/server/cached";
 
@@ -13,11 +13,11 @@ export default async function OpenGraphImage({
 }) {
   const { owner, repo, skill: slug } = await params;
   const skill = await cachedSkill(owner, repo, slug);
-  const cron = CADENCES[skill?.cadence ?? "weekly"].cron;
+  const schedule = skill?.schedule ?? suggestedSchedule("weekly", "morning");
   return ogImage({
     title: `Run ${skill?.name ?? slug} on a schedule`,
-    ...(skill && { subtitle: CADENCES[skill.cadence].label }),
-    command: `npx agent-schedules schedule ${slug} "${cron}"`,
-    hour: Number(cron.split(" ")[1]),
+    ...(skill && { subtitle: schedule.label }),
+    command: `npx agent-schedules schedule ${slug} "${schedule.cron}"`,
+    hour: schedule.hour,
   });
 }
