@@ -1,11 +1,21 @@
 import { type Effect, Layer, ManagedRuntime } from "effect";
+import type { DecisionModel } from "effect/ai";
 import { Database } from "@/db/database";
 import { Discord } from "@/lib/discord";
 import { GitHub } from "@/lib/github";
+import { JevLayer } from "@/lib/jev";
 import { RateLimit } from "@/lib/rate-limit";
+import { SkillsSh } from "@/lib/skills-sh";
 import { Billing } from "@/lib/stripe";
 
-export type Services = Database | GitHub | RateLimit | Discord | Billing;
+export type Services =
+  | Database
+  | GitHub
+  | RateLimit
+  | Discord
+  | Billing
+  | SkillsSh
+  | DecisionModel.DecisionModel;
 
 const AppLayer = Layer.mergeAll(
   Database.layer,
@@ -13,6 +23,8 @@ const AppLayer = Layer.mergeAll(
   RateLimit.layer,
   Discord.layer,
   Billing.layer,
+  SkillsSh.layer,
+  JevLayer,
 );
 
 // Next loads route handlers and pages as separate module copies; one process-wide runtime keeps

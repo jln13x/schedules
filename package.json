@@ -29,6 +29,7 @@
       "@types/react-dom": "19.3.0",
       "@upstash/ratelimit": "2.2.0",
       "@upstash/redis": "1.40.0",
+      "@vercel/oidc": "4.0.4",
       "@vercel/config": "0.12.0",
       "bun-types": "1.4.3",
       "class-variance-authority": "0.7.1",

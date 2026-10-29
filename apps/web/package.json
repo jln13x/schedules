@@ -22,6 +22,7 @@
     "@tailwindcss/typography": "catalog:",
     "@upstash/ratelimit": "catalog:",
     "@upstash/redis": "catalog:",
+    "@vercel/oidc": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
     "drizzle-orm": "catalog:",
