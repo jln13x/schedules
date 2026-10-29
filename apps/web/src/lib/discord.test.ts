@@ -11,12 +11,12 @@ it("builds a report embed with the reason and page", () => {
     reason: "dangerous",
     details: "It runs rm -rf.",
   });
-  expect(embed.title).toBe("Schedule report");
+  expect(embed.title).toBe("Skill report");
   expect(embed.url).toBe("https://schedules.sh/acme/tools/nightly");
   expect(embed.description).toBe("It runs rm -rf.");
   expect(embed.fields.map((field) => field.value)).toEqual([
     "/acme/tools/nightly",
-    "Dangerous or malicious prompt",
+    "Dangerous or malicious skill",
   ]);
 });
 

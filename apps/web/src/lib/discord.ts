@@ -23,7 +23,7 @@ export function feedbackEmbed(input: FeedbackInput): Embed {
   if (input.kind === "report") {
     return {
       ...base,
-      title: "Schedule report",
+      title: "Skill report",
       color: REPORT_COLOR,
       fields: [
         ...base.fields,

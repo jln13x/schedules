@@ -52,9 +52,7 @@ export function FeedbackDialog({
       <DialogContent className="sm:max-w-md">
         <form action={action} className="grid gap-4 text-left">
           <DialogHeader>
-            <DialogTitle>
-              {kind === "report" ? "Report this schedule" : "Send feedback"}
-            </DialogTitle>
+            <DialogTitle>{kind === "report" ? "Report this skill" : "Send feedback"}</DialogTitle>
             <DialogDescription>Anonymous. Do not include personal information.</DialogDescription>
           </DialogHeader>
           <input type="hidden" name="kind" value={kind} />
