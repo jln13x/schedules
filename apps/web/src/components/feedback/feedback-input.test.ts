@@ -1,7 +1,7 @@
 import { expect, it } from "bun:test";
-import { REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/lib/github";
+import { REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/db/format";
 import { FEEDBACK_INPUT } from "./feedback-input";
-import { schedulePath } from "@/lib/site";
+import { skillPath } from "@/lib/site";
 
 it("accepts reports and feedback for the longest valid schedule path", () => {
   const owner = "a".repeat(REPOSITORY_SEGMENT.maxLength ?? 0);
@@ -10,7 +10,7 @@ it("accepts reports and feedback for the longest valid schedule path", () => {
   expect(REPOSITORY_SEGMENT.safeParse(owner).success).toBe(true);
   expect(REPOSITORY_SEGMENT.safeParse(repo).success).toBe(true);
   expect(SCHEDULE_SLUG.safeParse(name).success).toBe(true);
-  const page = schedulePath({ owner, repo, name });
+  const page = skillPath({ owner, repo, slug: name });
   for (const input of [
     { kind: "report", reason: "broken", details: "" },
     { kind: "feedback", details: "Some feedback" },

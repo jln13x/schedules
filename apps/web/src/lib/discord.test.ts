@@ -2,7 +2,7 @@ import { expect, it } from "bun:test";
 import { Effect, Result } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { fakeFetch, usingFetch } from "@/server/testing";
-import { checkoutEmbed, Discord, feedbackEmbed, submissionEmbed } from "./discord";
+import { checkoutEmbed, Discord, feedbackEmbed } from "./discord";
 
 it("builds a report embed with the reason and page", () => {
   const embed = feedbackEmbed({
@@ -63,20 +63,6 @@ it("never fails a notification, with or without a webhook", async () => {
       ),
     );
   }
-});
-
-it("summarises a submission with counts and a capped list of names", () => {
-  const embed = submissionEmbed({
-    owner: "acme",
-    repo: "tools",
-    listed: Array.from({ length: 12 }, (_, index) => ({ name: `task-${index + 1}` })),
-    skipped: [{ file: "broken.md", reason: "missing schedule" }],
-    removed: [],
-  });
-  expect(embed.title).toBe("Submitted: acme/tools");
-  expect(embed.url).toBe("https://schedules.sh/acme/tools");
-  expect(embed.description).toEndWith("task-10 and 2 more");
-  expect(embed.fields.map((field) => field.value)).toEqual(["12", "1", "0"]);
 });
 
 it("describes a started checkout with only the requested listing", () => {

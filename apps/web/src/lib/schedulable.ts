@@ -92,8 +92,8 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
 export const SCHEDULABLE_THRESHOLD = 0.5;
 
 /**
- * A skill shows under "for you" when the team share is at most this, and under "for your team" when
- * it is at least one minus this, so a skill that works both ways appears in both.
+ * A skill shows under a fit when that answer's share is at least this, so a skill Jev splits
+ * evenly between "each person runs it" and "one run serves the team" appears under both.
  */
 export const FIT_THRESHOLD = 0.4;
 

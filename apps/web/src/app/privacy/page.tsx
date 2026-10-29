@@ -21,16 +21,15 @@ export default function PrivacyPage() {
       <h2>Data and purposes</h2>
       <p>
         We process IP addresses and request information to operate and protect the site, based on
-        our legitimate interests: to limit how often one address can submit, install or look up a
-        payment, and to count each install of a schedule once per address and day. For both we store
-        a keyed hash of the address rather than the address itself. Rate-limit entries expire within
-        minutes and install-counting entries within 24 hours, and neither is linked to an install
-        record. We use cookieless usage statistics to improve the site and public schedule
-        information from GitHub to maintain the directory.
+        our legitimate interests: to limit how often one address can send feedback, report a
+        listing, or look up a payment. We store a keyed hash of the address rather than the address
+        itself, and those entries expire within minutes. We use cookieless usage statistics to
+        improve the site and public listing data from skills.sh and GitHub to maintain the
+        directory.
       </p>
       <p>
-        Install records contain only the schedule and timestamp, with no installer email, account,
-        address or device identifier.
+        The directory records nothing about who installs or schedules a skill. Install counts shown
+        here are read from skills.sh.
       </p>
       <p>
         Stripe handles sponsorship payments and collects the required billing details. We use

@@ -7,7 +7,7 @@ import { PgliteDatabase } from "@/db/pglite";
 import { skills } from "@/db/schema";
 import { rankedSkills } from "@/db/skills";
 import { fakeFetch, testRuntime, usingFetch } from "@/server/testing";
-import { SCHEDULABLE_THRESHOLD, schedulableInput } from "./schedulable";
+import { schedulableInput } from "./schedulable";
 import { importSkills } from "./skill-import";
 import { SkillsSh } from "./skills-sh";
 
@@ -118,9 +118,7 @@ DATABASE_TEST(
       expect(requested(fetch).some((path) => path.includes("test-fork"))).toBe(false);
 
       const ranked = await run(
-        rankedSkills({ minRecurring: SCHEDULABLE_THRESHOLD }).pipe(
-          Effect.map((rows) => rows.filter((row) => row.owner === "test-acme")),
-        ),
+        rankedSkills().pipe(Effect.map((rows) => rows.filter((row) => row.owner === "test-acme"))),
         fetch,
       );
       expect(ranked).toMatchObject([

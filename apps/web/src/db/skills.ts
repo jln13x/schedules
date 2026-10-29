@@ -1,6 +1,7 @@
-import { and, desc, eq, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
-import { ABUSE_THRESHOLD } from "@/lib/schedulable";
+import { type Fit, isCadence } from "@/lib/cadence";
+import { ABUSE_THRESHOLD, FIT_THRESHOLD, SCHEDULABLE_THRESHOLD } from "@/lib/schedulable";
 import type { ListedSkill } from "@/lib/skills-sh";
 import { Database } from "./database";
 import { skills } from "./schema";
@@ -111,48 +112,107 @@ export const saveClassification = Effect.fn("saveClassification")(function* (
   );
 });
 
-export interface SkillRanking {
-  readonly minRecurring: number;
+/** Usefulness weighted by the log of installs, so neither a huge generic skill nor an unknown one the model happens to like can top the list alone. */
+const score = sql<number>`${skills.usefulness} * log(${skills.installs} + 10)`.mapWith(Number);
+
+const LISTED = and(
+  eq(skills.duplicate, false),
+  sql`${skills.recurring} >= ${SCHEDULABLE_THRESHOLD}`,
+  sql`${skills.abuse} < ${ABUSE_THRESHOLD}`,
+  isNull(skills.hidden),
+  or(isNull(skills.audit), ne(skills.audit, "fail")),
+);
+
+const fitsYou = sql`${skills.forTeam} <= ${1 - FIT_THRESHOLD}`;
+const fitsTeam = sql`${skills.forTeam} >= ${FIT_THRESHOLD}`;
+
+const LISTING_COLUMNS = {
+  id: skills.id,
+  owner: skills.owner,
+  repo: skills.repo,
+  slug: skills.slug,
+  name: skills.name,
+  description: skills.description,
+  installs: skills.installs,
+  usefulness: skills.usefulness,
+  forTeam: skills.forTeam,
+  cadence: skills.cadence,
+  audit: skills.audit,
+  firstSeenAt: skills.firstSeenAt,
+};
+
+export interface SkillQuery {
+  readonly query?: string;
+  readonly fit?: Fit;
   readonly limit?: number;
 }
 
-/**
- * Listed skills, best first: usefulness weighted by the log of installs, so neither a huge generic
- * skill nor an unknown one the model happens to like can top the list alone.
- */
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
+
+/** What one row of the directory needs; the fit flags save every reader from knowing the threshold. */
+export function listingOf(row: Effect.Success<ReturnType<typeof rankedSkills>>[number]) {
+  return {
+    ...row,
+    cadence: isCadence(row.cadence) ? row.cadence : "weekly",
+    usefulness: row.usefulness ?? 0,
+    fits: {
+      you: (row.forTeam ?? 0) <= 1 - FIT_THRESHOLD,
+      team: (row.forTeam ?? 0) >= FIT_THRESHOLD,
+    },
+  };
+}
+
+/** Listed skills, best first. */
 export const rankedSkills = Effect.fn("rankedSkills")(function* ({
-  minRecurring,
+  query,
+  fit,
   limit = 100,
-}: SkillRanking) {
-  const score = sql<number>`${skills.usefulness} * log(${skills.installs} + 10)`.mapWith(Number);
+}: SkillQuery = {}) {
+  const search = query?.trim();
   return yield* Database.query((db) =>
     db
-      .select({
-        id: skills.id,
-        owner: skills.owner,
-        repo: skills.repo,
-        slug: skills.slug,
-        name: skills.name,
-        description: skills.description,
-        installs: skills.installs,
-        recurring: skills.recurring,
-        usefulness: skills.usefulness,
-        forTeam: skills.forTeam,
-        cadence: skills.cadence,
-        audit: skills.audit,
-        score,
-      })
+      .select({ ...LISTING_COLUMNS, score })
       .from(skills)
       .where(
         and(
-          eq(skills.duplicate, false),
-          sql`${skills.recurring} >= ${minRecurring}`,
-          sql`${skills.abuse} < ${ABUSE_THRESHOLD}`,
-          isNull(skills.hidden),
-          or(isNull(skills.audit), ne(skills.audit, "fail")),
+          LISTED,
+          fit === "you" ? fitsYou : fit === "team" ? fitsTeam : undefined,
+          search
+            ? or(
+                ...[skills.id, skills.name, skills.description].map((column) =>
+                  ilike(column, `%${escapeLike(search)}%`),
+                ),
+              )
+            : undefined,
         ),
       )
       .orderBy(desc(score), skills.id)
       .limit(limit),
+  );
+});
+
+export const getSkill = Effect.fn("getSkill")(function* (
+  owner: string,
+  repo: string,
+  slug: string,
+) {
+  const [row] = yield* Database.query((db) =>
+    db
+      .select({ ...LISTING_COLUMNS, score })
+      .from(skills)
+      .where(and(LISTED, eq(skills.owner, owner), eq(skills.repo, repo), eq(skills.slug, slug)))
+      .limit(1),
+  );
+  return row && listingOf(row);
+});
+
+/** Every listed skill's path, for the sitemap. */
+export const listedSkillPaths = Effect.fn("listedSkillPaths")(function* () {
+  return yield* Database.query((db) =>
+    db
+      .select({ owner: skills.owner, repo: skills.repo, slug: skills.slug })
+      .from(skills)
+      .where(LISTED)
+      .orderBy(desc(score), skills.id),
   );
 });

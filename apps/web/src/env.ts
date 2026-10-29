@@ -7,7 +7,6 @@ export const env = createEnv({
   skipValidation: process.env.NODE_ENV === "test",
   server: {
     DATABASE_URL: z.url(),
-    GITHUB_TOKEN: z.string().min(1),
     CRON_SECRET: z.string().min(1),
     /** Jev, TypeSafe's decision model, judges which skills make good recurring tasks. */
     TYPESAFE_API_KEY: z.string().min(1),

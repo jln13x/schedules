@@ -1,5 +1,7 @@
+import { revalidateTag } from "next/cache";
 import { env } from "@/env";
 import { importSkills } from "@/lib/skill-import";
+import { SKILLS_TAG } from "@/server/cached";
 import { run } from "@/server/runtime";
 
 export const maxDuration = 300;
@@ -14,5 +16,7 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return Response.json(await run(importSkills(OPTIONS)));
+  const outcome = await run(importSkills(OPTIONS));
+  revalidateTag(SKILLS_TAG, "max");
+  return Response.json(outcome);
 }

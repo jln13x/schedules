@@ -4,10 +4,10 @@ import { getThresholdMap } from "@/lib/dither/matrices";
 import type { DitherMatrix } from "@/lib/dither/matrices";
 import { ditherMask } from "@/lib/dither/pattern";
 import { cssColor } from "@/lib/dither/tokens";
-import type { DitherColor, DitherColorName } from "@/lib/dither/tokens";
+import type { DitherColor } from "@/lib/dither/tokens";
 
 /**
- * The style kit: fill variants, bloom and the default series palette.
+ * The style kit: fill variants and bloom.
  * Everything here is pure and server-safe. The SVG pieces that use it
  * (`FillPattern`, `BloomGroup`, `Bloom`) live in `pattern.tsx`.
  */
@@ -28,21 +28,6 @@ export type FillEdge = "top" | "bottom" | "left" | "right";
 /** A soft glow in the fill's colour behind it. */
 const BLOOMS = ["off", "low", "high"] as const;
 export type Bloom = (typeof BLOOMS)[number];
-
-/**
- * Series colours in order: distinct hues, so two or more series never
- * rely on texture alone.
- */
-export const SERIES_COLORS = [
-  "ink",
-  "orange",
-  "green",
-  "pink",
-  "purple",
-  "blue",
-  "red",
-  "grey",
-] as const satisfies readonly [DitherColorName, ...DitherColorName[]];
 
 /** Write one SVG path covering the inked cells of a grid, in cell units. */
 const cellsPath = (width: number, height: number, inked: (x: number, y: number) => boolean) => {
@@ -246,22 +231,6 @@ const BLOOM_LEVELS = {
   high: { blur: 18, strength: 0.55 },
   low: { blur: 10, strength: 0.3 },
 } as const satisfies Record<Exclude<Bloom, "off">, { blur: number; strength: number }>;
-
-/**
- * Styles for a bloom layer: a blurred, translucent copy of a fill drawn
- * behind it. `--dither-bloom` scales the strength per theme (1 in dark,
- * lower in light, where glows turn muddy). `undefined` when off.
- */
-export const bloomLayerStyle = (bloom: Bloom): CSSProperties | undefined => {
-  if (bloom === "off") {
-    return undefined;
-  }
-  const { blur, strength } = BLOOM_LEVELS[bloom];
-  return {
-    filter: `blur(${blur}px)`,
-    opacity: `calc(var(--dither-bloom, 1) * ${strength})`,
-  };
-};
 
 /**
  * A CSS `filter` that glows around an element in `color`, for DOM pieces

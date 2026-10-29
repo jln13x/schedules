@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { PERIODS } from "@/lib/search-params";
-import { schedulePath, SITE } from "@/lib/site";
-import { cachedLeaderboard } from "@/server/cached";
+import { listingOf } from "@/db/skills";
+import { FIT_VALUES } from "@/lib/search-params";
+import { SITE, skillPath } from "@/lib/site";
+import { cachedSkills } from "@/server/cached";
 
 const SEARCH_INPUT = z.object({
   q: z.string().max(200, "Search is limited to 200 characters").default(""),
-  period: z.enum(PERIODS).default("all"),
+  fit: z.enum(FIT_VALUES).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
@@ -19,18 +20,21 @@ export async function GET(request: Request) {
   }
 
   try {
-    const rows = await cachedLeaderboard({ query: input.data.q, ...input.data });
+    const { q, fit, limit } = input.data;
+    const rows = await cachedSkills({ query: q, limit, ...(fit ? { fit } : {}) });
     return Response.json(
       {
-        schedules: rows.map((row) => ({
-          owner: row.owner,
-          repo: row.repo,
-          name: row.name,
-          displayName: row.displayName,
-          description: row.description,
-          installs: row.installs,
-          trendingInstalls: row.trendingInstalls,
-          url: `${SITE.origin}${schedulePath(row)}`,
+        schedules: rows.map(listingOf).map((skill) => ({
+          owner: skill.owner,
+          repo: skill.repo,
+          name: skill.slug,
+          displayName: skill.name,
+          description: skill.description,
+          installs: skill.installs,
+          usefulness: skill.usefulness,
+          cadence: skill.cadence,
+          fits: skill.fits,
+          url: `${SITE.origin}${skillPath(skill)}`,
         })),
       },
       { headers: { "cache-control": "public, s-maxage=60, stale-while-revalidate=600" } },

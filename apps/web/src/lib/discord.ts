@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { env } from "@/env";
 import { type FeedbackInput, REPORT_REASONS } from "@/components/feedback/feedback-input";
-import { repositoryPath, SITE } from "./site";
+import { SITE } from "./site";
 
 export interface Embed {
   title: string;
@@ -14,9 +14,7 @@ export interface Embed {
 
 const REPORT_COLOR = 0xf97316;
 const FEEDBACK_COLOR = 0x737373;
-const SUBMISSION_COLOR = 0x22c55e;
 const CHECKOUT_COLOR = 0x3b82f6;
-const LISTED_PREVIEW = 10;
 
 export function feedbackEmbed(input: FeedbackInput): Embed {
   const url = `${SITE.origin}${input.page}`;
@@ -36,31 +34,6 @@ export function feedbackEmbed(input: FeedbackInput): Embed {
   }
 
   return { ...base, title: "Feedback", color: FEEDBACK_COLOR, description: input.details };
-}
-
-/** A repository submitted through the site. Only public GitHub listing data, no submitter details. */
-export function submissionEmbed(submission: {
-  owner: string;
-  repo: string;
-  listed: ReadonlyArray<{ name: string }>;
-  skipped: ReadonlyArray<unknown>;
-  removed: ReadonlyArray<string>;
-}): Embed {
-  const names = submission.listed.slice(0, LISTED_PREVIEW).map(({ name }) => name);
-  const more = submission.listed.length - names.length;
-  return {
-    title: `Submitted: ${submission.owner}/${submission.repo}`,
-    url: `${SITE.origin}${repositoryPath(submission)}`,
-    color: SUBMISSION_COLOR,
-    ...(names.length > 0
-      ? { description: names.join(", ") + (more > 0 ? ` and ${more} more` : "") }
-      : {}),
-    fields: [
-      { name: "Listed", value: String(submission.listed.length), inline: true },
-      { name: "Skipped", value: String(submission.skipped.length), inline: true },
-      { name: "Removed", value: String(submission.removed.length), inline: true },
-    ],
-  };
 }
 
 /**

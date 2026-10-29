@@ -10,29 +10,22 @@ it("returns temporary failures from every form during limiter outages and keeps 
     import { expect, mock } from "bun:test";
     import { Effect, Layer } from "effect";
     import { Discord } from "./src/lib/discord.ts";
-    import { GitHub } from "./src/lib/github.ts";
     import { RateLimit, RateLimitUnavailable } from "./src/lib/rate-limit.ts";
     let unavailable = true;
     const take = () => unavailable ? Effect.fail(new RateLimitUnavailable({ cause: new Error("Redis unavailable") })) : Effect.succeed(true);
-    const refuse = () => Effect.die(new Error("Must not reach GitHub"));
     const services = Layer.mergeAll(
       Layer.succeed(RateLimit, RateLimit.of({ take, once: take })),
-      Layer.succeed(GitHub, GitHub.of({ fetchRepository: refuse, fetchRepositorySchedules: refuse, fetchPublicSchedule: refuse })),
       Layer.succeed(Discord, Discord.of({ send: () => Effect.void, notify: () => Effect.void })),
     );
     mock.module("next/headers", () => ({ headers: async () => new Headers() }));
     mock.module("next/cache", () => ({ updateTag() {} }));
-    mock.module("@/server/cached", () => ({ SCHEDULES_TAG: "schedules" }));
     mock.module("next/server", () => ({ after() {} }));
     mock.module("@/server/runtime", () => ({ run: (effect) => Effect.runPromise(Effect.provide(effect, services)) }));
     const { sendFeedback } = await import("./src/components/feedback/actions.ts");
-    const { submitRepository } = await import("./src/app/submit/actions.ts");
     const { sponsorCheckout } = await import("./src/app/sponsor/actions.ts");
     const feedback = await sendFeedback({ status: "idle" }, new FormData());
-    const submit = await submitRepository({ status: "idle" }, new FormData());
     const sponsor = await sponsorCheckout({}, new FormData());
     expect(feedback).toMatchObject({ status: "error", message: "Temporarily unavailable. Please try again later." });
-    expect(submit).toMatchObject({ status: "error", message: "Temporarily unavailable. Please try again later." });
     expect(sponsor).toEqual({ error: "Temporarily unavailable. Please try again later." });
     unavailable = false;
     const sponsorForm = new FormData();

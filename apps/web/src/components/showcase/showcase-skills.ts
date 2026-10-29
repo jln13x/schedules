@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { getLeaderboard } from "@/db";
 import { scheduleTiming } from "@/db/format";
-import { SAMPLE_SCHEDULES } from "@/db/samples";
-import { schedulePath } from "@/lib/site";
+import { listingOf, rankedSkills } from "@/db/skills";
+import { CADENCES } from "@/lib/cadence";
+import { skillPath } from "@/lib/site";
 
 const SHOWCASE_SIZE = 8;
 const WEEK = [1, 2, 3, 4, 5, 6, 0];
@@ -16,7 +16,7 @@ const DAY_NAMES = [
   "Saturdays",
 ];
 
-export interface ShowcaseSchedule {
+export interface ShowcaseSkill {
   key: string;
   name: string;
   time: string;
@@ -43,8 +43,8 @@ function cadenceOf(weekdays: ReadonlyArray<number> | null) {
 const SUMMARY_LENGTH = 150;
 
 /** The first sentence, cut at a word boundary so no card needs more than three lines. */
-function summaryOf(prompt: string) {
-  const sentence = prompt.split(/(?<=[.!?])\s/)[0]?.trim() ?? prompt;
+function summaryOf(text: string) {
+  const sentence = text.split(/(?<=[.!?])\s/)[0]?.trim() ?? text;
 
   if (sentence.length <= SUMMARY_LENGTH) {
     return sentence;
@@ -54,32 +54,17 @@ function summaryOf(prompt: string) {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), SUMMARY_LENGTH - 20)).trimEnd()}…`;
 }
 
-export const getShowcaseSchedules = Effect.fn("getShowcaseSchedules")(function* () {
-  const listed = yield* getLeaderboard({ limit: SHOWCASE_SIZE });
-  const entries =
-    listed.length >= 5
-      ? listed.map((entry) => ({
-          key: schedulePath(entry),
-          name: entry.displayName,
-          cron: entry.cron,
-          prompt: entry.prompt,
-        }))
-      : SAMPLE_SCHEDULES.map((entry) => ({
-          key: entry.name,
-          name: entry.displayName,
-          cron: entry.cron,
-          prompt: entry.prompt,
-        }));
-  return entries.slice(0, SHOWCASE_SIZE).map(({ key, name, cron, prompt }): ShowcaseSchedule => {
-    const { minute, hour, weekdays } = scheduleTiming(cron);
-    const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+export const getShowcaseSkills = Effect.fn("getShowcaseSkills")(function* () {
+  const listed = yield* rankedSkills({ limit: SHOWCASE_SIZE });
+  return listed.map(listingOf).map((skill): ShowcaseSkill => {
+    const { minute, hour, weekdays } = scheduleTiming(CADENCES[skill.cadence].cron);
     return {
-      key,
-      name,
-      time,
+      key: skillPath(skill),
+      name: skill.name,
+      time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       cadence: cadenceOf(weekdays),
       days: WEEK.map((day) => weekdays === null || weekdays.includes(day)),
-      summary: summaryOf(prompt),
+      summary: summaryOf(skill.description || skill.name),
     };
   });
 });
