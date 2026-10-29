@@ -69,7 +69,8 @@ export const Schedulable = Decision.make({
       criteria: {
         daily: "Every day, including weekends",
         weekdays: "Every working day",
-        weekly: "Once a week, or less often",
+        weekly: "Once a week",
+        monthly: "Once a month, or less often",
       },
     }),
     time: Decision.classify({

@@ -52,7 +52,7 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     session.payment_status = "paid";
     expect(await renderStatus("cs_test_fixture12345")).toContain("Thanks for supporting schedules.sh");
 
-    const skill = { id: "acme/tools/daily", owner: "acme", repo: "tools", slug: "daily", name: "daily", description: "Review the repository <img src=x onerror=alert(1)>", installs: 1200, usefulness: 67, forTeam: 0.95, cadence: "weekdays", time: "morning", schedule: { cron: "0 8 * * 1-5", hour: 8, weekdays: [1, 2, 3, 4, 5], label: "Every weekday at 08:00", days: "Every weekday", time: "08:00" }, audit: "pass", firstSeenAt: new Date(), score: 1, fits: { you: false, team: true } };
+    const skill = { id: "acme/tools/daily", owner: "acme", repo: "tools", slug: "daily", name: "daily", description: "Review the repository <img src=x onerror=alert(1)>", installs: 1200, usefulness: 67, forTeam: 0.95, cadence: "weekdays", time: "morning", schedule: { cron: "0 8 * * 1-5", hour: 8, weekdays: [1, 2, 3, 4, 5], monthDay: null, label: "Every weekday at 08:00", days: "Every weekday", time: "08:00" }, audit: "pass", firstSeenAt: new Date(), score: 1, fits: { you: false, team: true } };
     let found = skill;
     mock.module("@/server/cached", () => ({ SKILLS_TAG: "skills", cachedSkill: async () => found }));
     mock.module("next/cache", () => ({ updateTag() {} }));
@@ -60,7 +60,8 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     const page = await import("./src/app/[owner]/[repo]/[skill]/page.tsx");
     const render = async (params) => renderToStaticMarkup(await page.default({ params: Promise.resolve(params) }));
     const markup = await render({ owner: "acme", repo: "tools", skill: "daily" });
-    expect(markup).toContain("Run daily on a schedule");
+    expect(markup).toContain(">daily</h1>");
+    expect(markup).not.toContain("on a schedule</h1>");
     expect(markup).toContain("npx skills add acme/tools --skill daily");
     expect(markup).toContain("agent-schedules schedule daily &quot;0 8 * * 1-5&quot;");
     expect(markup).toContain(">Team<");

@@ -65,9 +65,7 @@ export default async function SkillPage({ params }: SkillPageProps) {
       >
         {owner}/{repo}
       </a>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-        Run {skill.name} on a schedule
-      </h1>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{skill.name}</h1>
       <div className="mt-4">
         <FitBadges fits={skill.fits} />
       </div>

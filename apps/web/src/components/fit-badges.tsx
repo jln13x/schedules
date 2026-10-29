@@ -33,9 +33,7 @@ export function FitBadges({ fits }: { fits: Record<Fit, boolean> }) {
           )}
         >
           <HugeiconsIcon icon={STYLES[fit].icon} size={12} strokeWidth={2} aria-hidden="true" />
-          <span className="underline decoration-current/50 decoration-dotted underline-offset-[3px]">
-            {FITS[fit].badge}
-          </span>
+          {FITS[fit].badge}
         </Tooltip>
       ))}
     </span>

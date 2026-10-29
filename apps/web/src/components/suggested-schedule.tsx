@@ -25,23 +25,25 @@ export function SuggestedSchedule({ schedule }: { schedule: Schedule }) {
           className="text-muted-foreground hover:text-foreground text-sm transition-colors"
           align="start"
         >
-          <span className="underline decoration-dotted underline-offset-4">{schedule.days}</span>
+          {schedule.days}
         </Tooltip>
       </div>
-      <ul className="flex gap-2 font-mono text-xs" aria-label="Days it runs">
-        {WEEK.map((day, index) => {
-          const runs = schedule.weekdays === null || schedule.weekdays.includes(day);
-          return (
-            <li
-              key={DAY_NAMES[index]}
-              aria-label={`${DAY_NAMES[index]}: ${runs ? "runs" : "off"}`}
-              className={cn("w-3 text-center", runs ? "text-foreground" : "opacity-30")}
-            >
-              {DAY_LETTERS[index]}
-            </li>
-          );
-        })}
-      </ul>
+      {schedule.monthDay === null && (
+        <ul className="flex gap-2 font-mono text-xs" aria-label="Days it runs">
+          {WEEK.map((day, index) => {
+            const runs = schedule.weekdays === null || schedule.weekdays.includes(day);
+            return (
+              <li
+                key={DAY_NAMES[index]}
+                aria-label={`${DAY_NAMES[index]}: ${runs ? "runs" : "off"}`}
+                className={cn("w-3 text-center", runs ? "text-foreground" : "opacity-30")}
+              >
+                {DAY_LETTERS[index]}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

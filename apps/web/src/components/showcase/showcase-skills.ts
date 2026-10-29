@@ -55,13 +55,13 @@ function summaryOf(text: string) {
 export const getShowcaseSkills = Effect.fn("getShowcaseSkills")(function* () {
   const listed = yield* rankedSkills({ limit: SHOWCASE_SIZE });
   return listed.map(listingOf).map((skill): ShowcaseSkill => {
-    const { time, weekdays } = skill.schedule;
+    const { time, weekdays, monthDay, days } = skill.schedule;
     return {
       key: skillPath(skill),
       name: skill.name,
       time,
-      cadence: cadenceOf(weekdays),
-      days: WEEK.map((day) => weekdays === null || weekdays.includes(day)),
+      cadence: monthDay === null ? cadenceOf(weekdays) : days,
+      days: WEEK.map((day) => monthDay === null && (weekdays === null || weekdays.includes(day))),
       summary: summaryOf(skill.description || skill.name),
     };
   });

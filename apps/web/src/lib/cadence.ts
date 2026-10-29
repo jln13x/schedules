@@ -1,8 +1,9 @@
-/** How often Jev suggests running a skill. The schedule format has no day of the month, so no monthly. */
+/** How often Jev suggests running a skill. */
 export const CADENCES = {
   daily: "Every day",
   weekdays: "Every weekday",
   weekly: "Every week",
+  monthly: "Every month",
 } as const;
 
 export type Cadence = keyof typeof CADENCES;
@@ -21,17 +22,36 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 export interface SuggestedSchedule {
   readonly cron: string;
   readonly hour: number;
-  /** Days of the week it runs, 0 for Sunday; null for every day. */
+  /** Days of the week it runs, 0 for Sunday; null for every day or a monthly run. */
   readonly weekdays: ReadonlyArray<number> | null;
+  /** Day of the month for a monthly run, otherwise null. */
+  readonly monthDay: number | null;
   /** "Every weekday at 08:00" */
   readonly label: string;
   readonly days: string;
   readonly time: string;
 }
 
-/** A weekly run at the end of the day reads as a wrap-up, so it lands on Friday; otherwise Monday. */
+/**
+ * A weekly run at the end of the day reads as a wrap-up, so it lands on Friday; otherwise Monday.
+ * A monthly run goes on the 1st.
+ */
 export function suggestedSchedule(cadence: Cadence, time: TimeOfDay): SuggestedSchedule {
   const { hour } = TIMES[time];
+  const clock = `${String(hour).padStart(2, "0")}:00`;
+
+  if (cadence === "monthly") {
+    return {
+      cron: `0 ${hour} 1 * *`,
+      hour,
+      weekdays: null,
+      monthDay: 1,
+      label: `Every month on the 1st at ${clock}`,
+      days: "Every month on the 1st",
+      time: clock,
+    };
+  }
+
   const weekdays =
     cadence === "daily"
       ? null
@@ -44,12 +64,12 @@ export function suggestedSchedule(cadence: Cadence, time: TimeOfDay): SuggestedS
       : cadence === "weekdays"
         ? "Every weekday"
         : `Every ${DAY_NAMES[weekdays?.[0] ?? 1]}`;
-  const clock = `${String(hour).padStart(2, "0")}:00`;
   const field = weekdays === null ? "*" : cadence === "weekdays" ? "1-5" : String(weekdays[0]);
   return {
     cron: `0 ${hour} * * ${field}`,
     hour,
     weekdays,
+    monthDay: null,
     label: `${days} at ${clock}`,
     days,
     time: clock,
