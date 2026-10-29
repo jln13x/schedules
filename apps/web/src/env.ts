@@ -9,6 +9,8 @@ export const env = createEnv({
     DATABASE_URL: z.url(),
     GITHUB_TOKEN: z.string().min(1),
     CRON_SECRET: z.string().min(1),
+    /** Jev, TypeSafe's decision model, judges which skills make good recurring tasks. */
+    TYPESAFE_API_KEY: z.string().min(1),
     KV_REST_API_URL: z.url(),
     KV_REST_API_TOKEN: z.string().min(1),
     STRIPE_SECRET_KEY: z.string().min(1),
