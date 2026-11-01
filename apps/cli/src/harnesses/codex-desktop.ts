@@ -97,10 +97,18 @@ type CodexRecord = typeof recordSchema.Type;
 
 const isRruleDay = (day: string): day is (typeof RRULE_DAYS)[number] =>
   (RRULE_DAYS as ReadonlyArray<string>).includes(day);
-const RRULE_FIELDS = new Set(["FREQ", "BYDAY", "BYHOUR", "BYMINUTE", "BYSECOND", "INTERVAL"]);
+const RRULE_FIELDS = new Set([
+  "FREQ",
+  "BYDAY",
+  "BYMONTHDAY",
+  "BYHOUR",
+  "BYMINUTE",
+  "BYSECOND",
+  "INTERVAL",
+]);
 
 export function fromRrule(rrule: string): Timing | string {
-  const unsupported = `rule ${rrule} is not a time of day on chosen weekdays`;
+  const unsupported = `rule ${rrule} is not a time of day on chosen weekdays or one day a month`;
   const fields = new Map(
     rrule
       .replace(/^RRULE:/, "")
@@ -114,14 +122,27 @@ export function fromRrule(rrule: string): Timing | string {
   const hour = wholeNumber(fields.get("BYHOUR"), 0, 23);
   const minute = wholeNumber(fields.get("BYMINUTE"), 0, 59);
   const days = fields.get("BYDAY")?.split(",");
+  const monthDay = wholeNumber(fields.get("BYMONTHDAY"), 1, 28);
 
   if (
     [...fields.keys()].some((key) => !RRULE_FIELDS.has(key)) ||
-    (frequency !== "DAILY" && frequency !== "WEEKLY") ||
     hour === undefined ||
     minute === undefined ||
     (fields.has("BYSECOND") && fields.get("BYSECOND") !== "0") ||
-    (fields.has("INTERVAL") && fields.get("INTERVAL") !== "1") ||
+    (fields.has("INTERVAL") && fields.get("INTERVAL") !== "1")
+  ) {
+    return unsupported;
+  }
+
+  if (frequency === "MONTHLY") {
+    return monthDay === undefined || days !== undefined
+      ? unsupported
+      : { minute, hour, weekdays: null, monthDay };
+  }
+
+  if (
+    fields.has("BYMONTHDAY") ||
+    (frequency !== "DAILY" && frequency !== "WEEKLY") ||
     (days !== undefined && !days.every(isRruleDay)) ||
     // Without BYDAY a weekly rule repeats on its start date's weekday, which the rule alone does not say.
     (frequency === "WEEKLY" && days === undefined)
@@ -138,7 +159,11 @@ export function fromRrule(rrule: string): Timing | string {
   };
 }
 
-export function toRrule({ minute, hour, weekdays }: Timing): string {
+export function toRrule({ minute, hour, weekdays, monthDay }: Timing): string {
+  if (monthDay !== undefined) {
+    return `FREQ=MONTHLY;BYMONTHDAY=${monthDay};BYHOUR=${hour};BYMINUTE=${minute};BYSECOND=0`;
+  }
+
   const days = RRULE_DAYS.filter(
     (day) => weekdays === null || weekdays.includes(CRON_WEEKDAY[day]),
   );

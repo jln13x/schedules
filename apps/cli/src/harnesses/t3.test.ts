@@ -166,6 +166,14 @@ test("T3 keeps the reply when socket cleanup fires a close event", async () => {
     const adapter = await connect(t3, { cwd: "/repo" });
     expect(await run(adapter.list)).toEqual([]);
     expect(closed).toBe(true);
+    // Refused, not moved to a weekly time, in previews as well as saves.
+    const monthly = {
+      name: "Monthly",
+      timing: { minute: 0, hour: 8, weekdays: null, monthDay: 1 },
+      prompt: "Do it.",
+    };
+    expect(await run(adapter.check(monthly, true))).toContain("no monthly schedule");
+    expect(run(adapter.save(monthly))).rejects.toThrow("no monthly schedule");
   } finally {
     fetchMock.mockRestore();
     globalThis.WebSocket = saved.socket;

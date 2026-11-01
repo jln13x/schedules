@@ -326,8 +326,8 @@ Review the repository for dependency updates.`}</code>
           </li>
           <li>
             <code>schedule</code>: <code>minute hour * * weekdays</code> in the harness&apos;s local
-            time. One minute (0 to 59) and one hour (0 to 23); day of month and month stay{" "}
-            <code>*</code>.
+            time, or <code>minute hour day * *</code> for once a month. One minute (0 to 59) and one
+            hour (0 to 23); the month stays <code>*</code>.
           </li>
           <li>
             The prompt is everything after the closing <code>---</code>, trimmed. It can&apos;t be
@@ -337,10 +337,13 @@ Review the repository for dependency updates.`}</code>
         <p>
           Weekdays use cron numbers, <code>0</code> for Sunday to <code>6</code> for Saturday (
           <code>7</code> is Sunday too), as a list (<code>1,3,5</code>), a range (<code>1-5</code>)
-          or <code>*</code>. Steps and day names aren&apos;t supported. These two fields are the
-          whole frontmatter; anything else is an error. <code>pull</code> and <code>add</code> write
-          files in exactly this form, so keep your formatter away from{" "}
-          <code>.agents/schedules/</code> and they will read as unchanged.
+          or <code>*</code>. Steps and day names aren&apos;t supported. A monthly schedule names one
+          day from <code>1</code> to <code>28</code>, so it comes every month, and keeps{" "}
+          <code>*</code> for weekdays: <code>0 8 1 * *</code> runs at 08:00 on the 1st. T3 Code
+          can&apos;t run monthly schedules; the other harnesses can. These two fields are the whole
+          frontmatter; anything else is an error. <code>pull</code> and <code>add</code> write files
+          in exactly this form, so keep your formatter away from <code>.agents/schedules/</code> and
+          they will read as unchanged.
         </p>
       </>
     ),
@@ -366,7 +369,8 @@ Review the repository for dependency updates.`}</code>
             <code>push</code> creates and updates tasks but never deletes them.
           </li>
           <li>
-            <code>pull</code> skips tasks that aren&apos;t a time of day on chosen weekdays.
+            <code>pull</code> skips tasks that aren&apos;t a time of day on chosen weekdays or one
+            day a month.
           </li>
           <li>Pushing a schedule to two harnesses runs it twice.</li>
         </ul>
@@ -476,6 +480,10 @@ Review the repository for dependency updates.`}</code>
             exactly as <code>doctor t3</code> lists it, such as <code>codex/gpt-6-astra</code>.
           </li>
           <li>New tasks run with full access, since nobody is there to approve tools.</li>
+          <li>
+            T3 runs tasks at a time on chosen weekdays, so a monthly schedule is refused rather than
+            moved to another day; give it a weekly time for T3.
+          </li>
           <li>Interval tasks have no fixed time; give them one in T3 to pull them.</li>
         </ul>
         <H2>Codex desktop (experimental)</H2>

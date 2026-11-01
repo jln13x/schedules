@@ -2,8 +2,8 @@ import { expect, it } from "bun:test";
 import { formatWhen } from "@/db/format";
 import { CADENCES, type Cadence, suggestedSchedule, TIMES, type TimeOfDay } from "./cadence";
 
-it("gives every weekly-or-faster cadence a cron the schedule format accepts", () => {
-  for (const cadence of (Object.keys(CADENCES) as Cadence[]).filter((c) => c !== "monthly")) {
+it("gives every cadence a cron the schedule format accepts", () => {
+  for (const cadence of Object.keys(CADENCES) as Cadence[]) {
     for (const time of Object.keys(TIMES) as TimeOfDay[]) {
       expect(() => formatWhen(suggestedSchedule(cadence, time).cron)).not.toThrow();
     }

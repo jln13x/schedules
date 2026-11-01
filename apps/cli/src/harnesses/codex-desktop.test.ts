@@ -16,6 +16,12 @@ test("Codex rules convert both ways", () => {
     hour: 17,
     weekdays: [0, 2],
   });
+  const monthly = { minute: 0, hour: 9, weekdays: null, monthDay: 1 };
+  expect(toRrule(monthly)).toBe("FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=9;BYMINUTE=0;BYSECOND=0");
+  expect(fromRrule("RRULE:FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=9;BYMINUTE=0")).toEqual(monthly);
+  expect(typeof fromRrule("FREQ=MONTHLY;BYMONTHDAY=31;BYHOUR=9;BYMINUTE=0")).toBe("string");
+  expect(typeof fromRrule("FREQ=MONTHLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0")).toBe("string");
+  expect(typeof fromRrule("FREQ=WEEKLY;BYMONTHDAY=1;BYDAY=MO;BYHOUR=9;BYMINUTE=0")).toBe("string");
   expect(typeof fromRrule("FREQ=HOURLY;BYMINUTE=10")).toBe("string");
   expect(typeof fromRrule("FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0")).toBe("string");
   expect(typeof fromRrule("FREQ=DAILY;BYHOUR=;BYMINUTE=0")).toBe("string");

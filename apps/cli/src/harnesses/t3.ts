@@ -122,6 +122,10 @@ export function fromT3Schedule(schedule: unknown): Timing | string {
 
 const pad = (value: number) => String(value).padStart(2, "0");
 
+// T3 runs fixed times on weekdays; a monthly run has no faithful translation, so it is refused.
+const MONTHLY =
+  "T3 runs tasks at a time on chosen weekdays and has no monthly schedule; give this one a weekly time, or push it to a harness that runs monthly";
+
 export function toT3Schedule({ minute, hour, weekdays }: Timing) {
   return {
     type: "fixed_time" as const,
@@ -421,6 +425,10 @@ const make = Effect.gen(function* () {
   };
 
   const save = Effect.fn(function* ({ name, timing, prompt }: Schedule) {
+    if (timing.monthDay !== undefined) {
+      return yield* fail(MONTHLY);
+    }
+
     if (!project) {
       return yield* fail(`No T3 project for ${cwd}`);
     }
@@ -483,8 +491,12 @@ const make = Effect.gen(function* () {
   return Harness.of({
     setup: project ? [] : [addProject],
     list: loadTasks.pipe(Effect.map((all) => all.map(toLive))),
-    check: (_schedule, existing) =>
-      existing || model() !== undefined ? Effect.succeed(undefined) : missingModel,
+    check: (schedule, existing) =>
+      schedule.timing.monthDay !== undefined
+        ? Effect.succeed(MONTHLY)
+        : existing || model() !== undefined
+          ? Effect.succeed(undefined)
+          : missingModel,
     save,
   });
 });

@@ -4,15 +4,20 @@ import { Result, Schema } from "effect";
 
 const WEEKDAY_COUNT = 7;
 const NAME_LIMIT = 120;
+// The last day every month has, so a monthly run never skips a month.
+const LAST_MONTH_DAY = 28;
 
 /**
- * Wall-clock runs on selected weekdays, in the scheduler's local time zone.
- * `weekdays` uses cron numbering (0 is Sunday); null means every day.
+ * Wall-clock runs in the scheduler's local time zone, on selected weekdays or on one day a month.
+ * `weekdays` uses cron numbering (0 is Sunday); null means every day, and it is always null for a
+ * monthly run.
  */
 export interface Timing {
   readonly minute: number;
   readonly hour: number;
   readonly weekdays: ReadonlyArray<number> | null;
+  /** The day of the month, 1 to 28, for a run once a month. */
+  readonly monthDay?: number | undefined;
 }
 
 export interface Schedule {
@@ -74,12 +79,13 @@ function parseWeekdays(field: string): ReadonlyArray<number> | null | string {
   return normalizeWeekdays(days);
 }
 
-// Only the shape every supported scheduler can represent exactly: a time of day on chosen weekdays.
+// Only shapes the schedulers can represent exactly: a time of day on chosen weekdays, or on one
+// day a month.
 function parseCron(cron: string): Timing | string {
   const fields = cron.trim().split(/\s+/);
 
   if (fields.length !== 5) {
-    return "Expected cron 'minute hour * * weekdays', for example '0 9 * * 1-5'";
+    return "Expected cron 'minute hour * * weekdays' or 'minute hour day * *', for example '0 9 * * 1-5'";
   }
 
   const [minuteField, hourField, dayOfMonth, month, weekdayField = ""] = fields;
@@ -94,12 +100,23 @@ function parseCron(cron: string): Timing | string {
     return `Hour ${hourField} must be a number from 0 to 23`;
   }
 
-  if (dayOfMonth !== "*") {
-    return "Day of month must be *";
-  }
-
   if (month !== "*") {
     return "Month must be *";
+  }
+
+  if (dayOfMonth !== "*") {
+    const monthDay = wholeNumber(dayOfMonth, 1, LAST_MONTH_DAY);
+
+    if (monthDay === undefined) {
+      return `Day of month ${dayOfMonth} must be a number from 1 to ${LAST_MONTH_DAY}, so it comes every month`;
+    }
+
+    // Cron runs on either field when both are set, which no other scheduler does.
+    if (weekdayField !== "*") {
+      return "A monthly schedule needs * for weekdays";
+    }
+
+    return { minute, hour, weekdays: null, monthDay };
   }
 
   const weekdays = parseWeekdays(weekdayField);
@@ -109,7 +126,7 @@ function parseCron(cron: string): Timing | string {
 export function timingFromCron(cron: string): Timing | string {
   const timing = parseCron(cron);
   return typeof timing === "string"
-    ? `cron "${cron}" is not a time of day on chosen weekdays`
+    ? `cron "${cron}" is not a time of day on chosen weekdays or one day a month`
     : timing;
 }
 
@@ -123,7 +140,11 @@ export function normalizeWeekdays(days: ReadonlyArray<number>): ReadonlyArray<nu
   return unique.length === WEEKDAY_COUNT ? null : unique;
 }
 
-export function formatCron({ minute, hour, weekdays }: Timing): string {
+export function formatCron({ minute, hour, weekdays, monthDay }: Timing): string {
+  if (monthDay !== undefined) {
+    return `${minute} ${hour} ${monthDay} * *`;
+  }
+
   if (weekdays === null) {
     return `${minute} ${hour} * * *`;
   }
@@ -155,13 +176,18 @@ const DAY_NAMES = [
 ];
 const WORKDAYS = "1,2,3,4,5";
 
-export function describeTiming({ minute, hour, weekdays }: Timing): string {
+const ordinal = (day: number) =>
+  `${day}${day >= 11 && day <= 13 ? "th" : (["th", "st", "nd", "rd"][day % 10] ?? "th")}`;
+
+export function describeTiming({ minute, hour, weekdays, monthDay }: Timing): string {
   const days =
-    weekdays === null
-      ? "Daily"
-      : weekdays.join(",") === WORKDAYS
-        ? "Weekdays"
-        : weekdays.map((day) => DAY_NAMES[day]).join(", ");
+    monthDay !== undefined
+      ? `Monthly on the ${ordinal(monthDay)}`
+      : weekdays === null
+        ? "Daily"
+        : weekdays.join(",") === WORKDAYS
+          ? "Weekdays"
+          : weekdays.map((day) => DAY_NAMES[day]).join(", ");
   return `${days} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
