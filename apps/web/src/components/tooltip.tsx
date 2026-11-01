@@ -40,8 +40,10 @@ export function Tooltip({
       </button>
       <span
         aria-hidden="true"
+        // Out of the layout until shown: even invisible, it would make the container it sits near the
+        // bottom of scrollable.
         className={cn(
-          "border-border bg-popover text-foreground pointer-events-none absolute top-full z-20 mt-2 w-max max-w-64 rounded-md border px-2.5 py-1.5 text-left font-sans text-xs leading-5 font-normal tracking-normal normal-case opacity-0 shadow-sm transition-opacity group-focus-within/tooltip:opacity-100 group-hover/tooltip:opacity-100",
+          "border-border bg-popover text-foreground pointer-events-none absolute top-full z-20 mt-2 hidden w-max max-w-64 rounded-md border px-2.5 py-1.5 text-left font-sans text-xs leading-5 font-normal tracking-normal normal-case shadow-sm group-focus-within/tooltip:block group-hover/tooltip:block",
           ALIGN[align],
         )}
       >

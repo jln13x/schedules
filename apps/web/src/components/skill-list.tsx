@@ -93,59 +93,58 @@ export function SkillList({
 
 function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorEntry[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left text-sm">
-        <thead className="border-border text-muted-foreground border-b font-mono text-xs font-normal">
-          <tr>
-            <th className="w-12 py-4 font-normal">#</th>
-            <th className="py-4 font-normal">SKILL</th>
-            <th className="hidden w-48 py-4 font-normal md:table-cell">SUGGESTED</th>
-            <th className="py-4 text-right font-normal">
-              <span className="inline-flex items-center gap-1.5">
-                INSTALLS
-                <Hint label="Install counts come from skills.sh" align="end">
-                  Counted by skills.sh
-                </Hint>
-              </span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sponsors.map((sponsor) => (
-            <SponsorRow key={sponsor.id} sponsor={sponsor} />
-          ))}
-          {rows.map((skill, index) => (
-            <tr key={skill.id} className="border-border hover:bg-secondary/50 relative border-b">
-              <td className="text-muted-foreground py-5 font-mono">{index + 1}</td>
-              <td className="py-5 pr-4">
-                <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3">
-                  <Link
-                    href={skillPath(skill)}
-                    className="font-semibold outline-offset-4 after:absolute after:inset-0 hover:underline"
-                  >
-                    {skill.name}
-                  </Link>
-                  <span className="text-muted-foreground font-mono text-xs">
-                    {skill.owner}/{skill.repo}
-                  </span>
-                  {/* Above the row's link so the badges take hover, and above the next row's
+    // No scroll container: one would clip the badges' tooltips, so long names wrap instead.
+    <table className="w-full border-collapse text-left text-sm">
+      <thead className="border-border text-muted-foreground border-b font-mono text-xs font-normal">
+        <tr>
+          <th className="w-12 py-4 font-normal">#</th>
+          <th className="py-4 font-normal">SKILL</th>
+          <th className="hidden w-48 py-4 font-normal md:table-cell">SUGGESTED</th>
+          <th className="py-4 text-right font-normal">
+            <span className="inline-flex items-center gap-1.5">
+              INSTALLS
+              <Hint label="Install counts come from skills.sh" align="end">
+                Counted by skills.sh
+              </Hint>
+            </span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {sponsors.map((sponsor) => (
+          <SponsorRow key={sponsor.id} sponsor={sponsor} />
+        ))}
+        {rows.map((skill, index) => (
+          <tr key={skill.id} className="border-border hover:bg-secondary/50 relative border-b">
+            <td className="text-muted-foreground py-5 font-mono">{index + 1}</td>
+            <td className="py-5 pr-4">
+              <div className="flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3">
+                <Link
+                  href={skillPath(skill)}
+                  className="font-semibold [overflow-wrap:anywhere] outline-offset-4 after:absolute after:inset-0 hover:underline"
+                >
+                  {skill.name}
+                </Link>
+                <span className="text-muted-foreground font-mono text-xs [overflow-wrap:anywhere]">
+                  {skill.owner}/{skill.repo}
+                </span>
+                {/* Above the row's link so the badges take hover, and above the next row's
                       badges while a tooltip is open, since each row stacks on its own. */}
-                  <span className="relative z-10 focus-within:z-20 hover:z-20">
-                    <FitBadges fits={skill.fits} />
-                  </span>
-                </div>
-              </td>
-              <td className="text-muted-foreground hidden py-5 pr-8 font-mono text-xs md:table-cell">
-                {skill.schedule.label}
-              </td>
-              <td className="py-5 text-right font-mono tabular-nums">
-                {compactNumber(skill.installs)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                <span className="relative z-10 focus-within:z-20 hover:z-20">
+                  <FitBadges fits={skill.fits} />
+                </span>
+              </div>
+            </td>
+            <td className="text-muted-foreground hidden py-5 pr-8 font-mono text-xs md:table-cell">
+              {skill.schedule.label}
+            </td>
+            <td className="py-5 text-right font-mono tabular-nums">
+              {compactNumber(skill.installs)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
