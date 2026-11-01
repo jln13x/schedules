@@ -4,9 +4,7 @@ import type { ShowcaseSkill } from "@/components/showcase/showcase-skills";
 import { HeroActions, Label, WorksWith } from "./parts";
 
 const PITCH = "Put your agent on a schedule";
-// What a directory alone can't give: the schedule is a file, so it travels with the code.
-const PROMISE =
-  "Find skills that do useful work on their own. Their schedules live in your repo, so your team shares them and any agent can run them.";
+const PROMISE = "Skills that work while you don't.";
 
 export function Landing({
   showcase,
@@ -31,9 +29,7 @@ export function Landing({
           <p className="mt-6 text-xl leading-snug tracking-tight text-balance sm:mt-8 sm:text-2xl">
             {PITCH}
           </p>
-          <p className="text-muted-foreground mt-3 max-w-xl text-sm leading-6 text-pretty sm:text-base sm:leading-7">
-            {PROMISE}
-          </p>
+          <p className="text-muted-foreground mt-2 text-base sm:text-lg">{PROMISE}</p>
           <HeroActions className="mt-6 sm:mt-8" />
           <WorksWith className="mt-8 sm:mt-10" />
         </div>

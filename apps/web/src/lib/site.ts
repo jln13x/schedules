@@ -4,8 +4,7 @@ export const SITE = {
   name: "schedules.sh",
   title: "The Agent Schedules Directory",
   origin: "https://schedules.sh",
-  description:
-    "Put your agent on a schedule: skills that do useful work on their own, scheduled in your repo so your team shares them.",
+  description: "Put your agent on a schedule. Skills that work while you don't.",
 };
 export const GITHUB_URL = "https://github.com/jln13x/schedules";
 
