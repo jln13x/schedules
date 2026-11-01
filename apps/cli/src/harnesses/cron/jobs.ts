@@ -61,6 +61,8 @@ export const jobSchema = Schema.Struct({
   // The PATH at push time: cron starts jobs with a bare one.
   path: Schema.String,
   updatedAt: Schema.String,
+  // Paused jobs keep their files but leave the crontab, until they are enabled again.
+  paused: Schema.optionalKey(Schema.Boolean),
 });
 export type Job = typeof jobSchema.Type;
 

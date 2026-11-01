@@ -83,7 +83,11 @@ export default async function SkillPage({ params }: SkillPageProps) {
       </div>
       <div className="mt-12 grid gap-12 md:grid-cols-[minmax(0,1fr)_200px] md:gap-16">
         <div className="min-w-0">
-          <SkillCommands skill={skill} cron={skill.schedule.cron} />
+          <SkillCommands
+            skill={skill}
+            cron={skill.schedule.cron}
+            monthly={skill.schedule.monthDay !== null}
+          />
           <p className="text-muted-foreground mt-6 text-sm">
             Read the skill on{" "}
             <a href={skillsShUrl(skill)} className="underline decoration-dotted underline-offset-4">

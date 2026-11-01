@@ -46,13 +46,28 @@ interface LastRun {
 }
 
 export type LiveSchedule = {
+  /** The scheduler's own id for the task, which pushes and controls address it by. */
+  readonly id: string;
   readonly name: string;
   readonly status: Status;
+  /** The folder its runs start in, when the scheduler ties it to one. */
+  readonly workspace?: string | undefined;
   readonly lastRun?: LastRun | undefined;
-  /** Settings a push can change without touching the schedule; known for command-line agents. */
+  /** Settings a push can change without touching the schedule. */
   readonly model?: string | undefined;
   readonly access?: Access | undefined;
-} & ({ readonly schedule: Schedule } | { readonly unsupported: string });
+  /** The scheduler's other settings, which pushes keep: thread, worktree, permission mode. */
+  readonly settings?: Readonly<Record<string, string>> | undefined;
+} & (
+  | { readonly schedule: Schedule }
+  | { readonly unsupported: string; readonly prompt?: string | undefined }
+);
+
+/** What a save created or updated, and a note when the outcome needs one. */
+export interface Saved {
+  readonly id: string;
+  readonly note?: string | undefined;
+}
 
 export interface SetupStep {
   readonly description: string;
@@ -71,19 +86,52 @@ export class Harness extends Context.Service<
       schedule: Schedule,
       existing: boolean,
     ) => Effect.Effect<string | undefined, HarnessError>;
-    /** Resolves to a short note when the outcome needs one, such as whether the app loaded it. */
-    readonly save: (schedule: Schedule) => Effect.Effect<string | undefined, HarnessError>;
+    /**
+     * Creates the task, or updates the one with this id, or else the one with the schedule's name.
+     * The note says what the outcome needs said, such as whether the app loaded it.
+     */
+    readonly save: (schedule: Schedule, id?: string) => Effect.Effect<Saved, HarnessError>;
     readonly caveat?: string | undefined;
   }
 >()("agent-schedules/Harness") {}
 
 type Diagnosis = ReadonlyArray<string>;
 
-/** A harness: how to connect to it, and how to explain its setup when that fails. */
+type Control<A> = (id: string) => Effect.Effect<A, HarnessError, Platform>;
+
+/**
+ * A harness: how to connect to it for one workspace, how to explain its setup when that fails, and
+ * what it lets anyone do to a task by id, whatever workspace the task belongs to. A control a
+ * harness can't offer is left out.
+ */
 export interface HarnessDefinition {
   readonly layer: Layer.Layer<Harness, HarnessError, Workspace | Platform>;
   readonly doctor: Effect.Effect<Diagnosis, HarnessError, Workspace | Platform>;
+  /** Every task, in every workspace, including ones made in the app. Reading starts nothing. */
+  readonly inventory: Effect.Effect<ReadonlyArray<LiveSchedule>, HarnessError, Platform>;
+  /** Pausing or resuming changes nothing else about the task. */
+  readonly setEnabled?: (
+    id: string,
+    enabled: boolean,
+  ) => Effect.Effect<void, HarnessError, Platform>;
+  /** Starts one run now and leaves a paused task paused. Resolves to a note. */
+  readonly runNow?: Control<string | undefined>;
+  /** Deletes the task from the scheduler. Resolves to a note. */
+  readonly remove?: Control<string | undefined>;
 }
+
+const CONTROLS = ["enable", "disable", "run-now", "remove"] as const;
+export type ControlName = (typeof CONTROLS)[number];
+
+/** The controls a harness offers, in the words the CLI uses for them. */
+export const controlsOf = (definition: HarnessDefinition): ReadonlyArray<ControlName> =>
+  CONTROLS.filter((control) =>
+    control === "enable" || control === "disable"
+      ? definition.setEnabled !== undefined
+      : control === "run-now"
+        ? definition.runNow !== undefined
+        : definition.remove !== undefined,
+  );
 
 /** Runs an effect against this machine's files and processes. */
 export const run = <A>(effect: Effect.Effect<A, HarnessError, Platform>) =>

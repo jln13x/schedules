@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { connect, run } from "../../harness.ts";
-import { cronLines, withoutCronJob } from "./crontab.ts";
+import { cronLines, runCommand, withoutCronJob } from "./crontab.ts";
 import { cronHarness, removeJob } from "./index.ts";
 import { type Job, jobId, lastRun, listJobs, preflight, runJob } from "./jobs.ts";
 
@@ -83,6 +83,39 @@ describe.skipIf(process.platform === "win32")("scheduling with cron", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  test("a CLI running from the runner copy keeps it", async () => {
+    const copy = join(root, "state", "agent-schedules.mjs");
+    await mkdir(join(root, "state"), { recursive: true });
+    await writeFile(copy, "// the runner\n");
+    const script = process.argv[1];
+
+    try {
+      process.argv[1] = copy;
+      expect((await run(runCommand("job")))[1]).toBe(copy);
+      expect(await readFile(copy, "utf8")).toBe("// the runner\n");
+    } finally {
+      process.argv[1] = script;
+    }
+  });
+
+  test("agents confined to the repository refuse a global skill below full access", async () => {
+    const cwd = join(root, "repo");
+    const schedule = {
+      name: "Global",
+      timing: { minute: 0, hour: 8, weekdays: null },
+      prompt: "Use the x skill: read ~/.agents/skills/x/SKILL.md and follow it.",
+      skill: "x",
+    };
+    const confined = await connect(cronHarness("opencode"), { cwd, model: "a/b" });
+    expect(await run(confined.check(schedule, false))).toContain(
+      "OpenCode can't read files outside the repository at read access",
+    );
+    const full = await connect(cronHarness("opencode"), { cwd, model: "a/b", access: "full" });
+    expect(await run(full.check(schedule, false))).toBeUndefined();
+    const codex = await connect(cronHarness("codex"), { cwd });
+    expect(await run(codex.check(schedule, false))).toBeUndefined();
+  });
+
   test("push, list, run, and remove", async () => {
     await writeFile(join(root, "table"), "MAILTO=me\n");
     const cwd = join(root, "repo");
@@ -94,10 +127,13 @@ describe.skipIf(process.platform === "win32")("scheduling with cron", () => {
     };
 
     expect(await run(adapter.check(schedule, false))).toBeUndefined();
-    expect(await run(adapter.save(schedule))).toBe("Weekdays 09:07 via cron, edit access");
+    const created = await run(adapter.save(schedule));
+    expect(created.note).toBe("Weekdays 09:07 via cron, edit access");
     expect(await run(adapter.list)).toEqual([
       {
+        id: created.id,
         name: "Morning brief",
+        workspace: cwd,
         status: "active",
         lastRun: undefined,
         model: undefined,

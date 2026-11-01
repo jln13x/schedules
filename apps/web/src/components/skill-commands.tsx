@@ -25,9 +25,11 @@ function subscribe(onChange: () => void) {
 export function SkillCommands({
   skill,
   cron,
+  monthly,
 }: {
   skill: { owner: string; repo: string; slug: string };
   cron: string;
+  monthly: boolean;
 }) {
   const saved = useSyncExternalStore(
     subscribe,
@@ -66,14 +68,31 @@ export function SkillCommands({
           />
         </li>
         <li className="grid gap-2">
-          <p className="text-muted-foreground text-xs">2. Schedule it, then push to your agent</p>
+          <p className="text-muted-foreground text-xs">2. Schedule it in your repository</p>
           <CopyCommand
             key={`schedule-${runner}`}
             command={`${command} agent-schedules schedule ${skill.slug} "${cron}"`}
           />
         </li>
+        <li className="grid gap-2">
+          <p className="text-muted-foreground text-xs">
+            3. Push it to the agent that runs it, such as <code>t3</code> or{" "}
+            <code>claude-code</code> (
+            <a href="/docs/harnesses" className="underline decoration-dotted underline-offset-4">
+              all harnesses
+            </a>
+            )
+          </p>
+          <CopyCommand
+            key={`push-${runner}`}
+            command={`${command} agent-schedules push <harness>`}
+          />
+        </li>
       </ol>
-      <p className="text-muted-foreground mt-3 text-xs">Runs use your agent and your accounts.</p>
+      <p className="text-muted-foreground mt-3 text-xs">
+        Runs use your agent and your accounts.
+        {monthly && " T3 Code can't run monthly schedules; the other harnesses can."}
+      </p>
     </section>
   );
 }

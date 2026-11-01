@@ -6,6 +6,7 @@ import {
   type HarnessDefinition,
   type LiveSchedule,
   type Platform,
+  type Saved,
   Harness,
   Workspace,
   decode,
@@ -17,6 +18,7 @@ import {
   loose,
   parseJson,
   readTextIfExists,
+  removePath,
   writeText,
 } from "../harness.ts";
 import { type Schedule, type Timing, normalizeWeekdays, slug, wholeNumber } from "../schedule.ts";
@@ -208,23 +210,38 @@ const readEntries = Effect.gen(function* () {
   return entries;
 });
 
-const toLive = ({ name, record }: Entry): LiveSchedule => {
+// Settings an automation may carry beside its schedule; pushes keep every field either way.
+const SETTINGS = ["execution_environment", "model", "reasoning_effort"] as const;
+
+const toLive = ({ id, name, cwds, record }: Entry): LiveSchedule => {
+  const workspace = cwds.length === 1 ? cwds[0] : undefined;
+
   if (!record) {
     return {
+      id,
       name,
+      workspace,
       status: "active",
       unsupported: "automation.toml is not a Codex automation this tool can read",
     };
   }
 
+  const settings = {
+    kind: record.kind,
+    ...Object.fromEntries(
+      SETTINGS.flatMap((key) => (typeof record[key] === "string" ? [[key, record[key]]] : [])),
+    ),
+    ...(cwds.length > 1 ? { workspaces: cwds.join(", ") } : {}),
+  };
   const status = record.status === "PAUSED" ? "paused" : "active";
   const timing =
     record.kind === "cron"
       ? fromRrule(record.rrule)
       : `${record.kind} automations belong to a thread`;
+  const base = { id, name: record.name, workspace, status, settings } as const;
   return typeof timing === "string"
-    ? { name: record.name, status, unsupported: timing }
-    : { name: record.name, status, schedule: { name: record.name, timing, prompt: record.prompt } };
+    ? { ...base, unsupported: timing, prompt: record.prompt }
+    : { ...base, schedule: { name: record.name, timing, prompt: record.prompt } };
 };
 
 const make = Effect.gen(function* () {
@@ -234,10 +251,16 @@ const make = Effect.gen(function* () {
     Effect.map((entries) => entries.filter((entry) => entry.cwds.includes(cwd))),
   );
 
-  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule) {
+  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule, target?: string) {
     const now = Date.now();
     const definition = { name, prompt, rrule: toRrule(timing), updated_at: now };
-    const existing = (yield* mine).find((entry) => entry.name === name)?.record;
+    const existing = (yield* mine).find((entry) =>
+      target === undefined ? entry.name === name : entry.id === target,
+    )?.record;
+
+    if (target !== undefined && !existing) {
+      return yield* fail(`Codex has no automation ${target} for ${cwd} any more`);
+    }
 
     if (existing) {
       // One automation can serve several workspaces; a push from one would rewrite them all.
@@ -248,7 +271,7 @@ const make = Effect.gen(function* () {
       }
 
       yield* writeText(recordPath(existing.id), stringify({ ...existing, ...definition }));
-      return yield* confirmLoaded(existing.id);
+      return { id: existing.id, note: yield* confirmLoaded(existing.id) } satisfies Saved;
     }
 
     const id = slug(name);
@@ -270,7 +293,7 @@ const make = Effect.gen(function* () {
         created_at: now,
       }),
     );
-    return yield* confirmLoaded(id);
+    return { id, note: yield* confirmLoaded(id) } satisfies Saved;
   });
 
   return Harness.of({
@@ -286,7 +309,7 @@ const make = Effect.gen(function* () {
       Effect.map((entries) => entries.map(toLive)),
       Effect.provideContext(services),
     ),
-    save: (schedule) => save(schedule).pipe(Effect.provideContext(services)),
+    save: (schedule, id) => save(schedule, id).pipe(Effect.provideContext(services)),
   });
 });
 
@@ -320,4 +343,56 @@ const doctor = Effect.gen(function* () {
   ];
 });
 
-export const codexDesktop: HarnessDefinition = { layer: Layer.effect(Harness, make), doctor };
+/** The automation with this id, refused when several workspaces share it. */
+const ownRecord = (id: string) =>
+  Effect.gen(function* () {
+    const entry = (yield* readEntries).find((candidate) => candidate.id === id);
+
+    if (!entry?.record) {
+      return yield* fail(`Codex has no automation ${id} this tool can read`);
+    }
+
+    if (entry.cwds.length > 1) {
+      return yield* fail(
+        `Codex automation ${id} is shared by ${entry.cwds.length} workspaces; change it in the Codex app`,
+      );
+    }
+
+    return entry.record;
+  });
+
+/** Whether the app dropped the automation from its table, which it does on its own schedule. */
+const confirmRemoved = (id: string) =>
+  appAutomations.pipe(
+    Effect.orElseSucceed(() => null),
+    Effect.repeat({
+      schedule: EffectSchedule.spaced("500 millis"),
+      times: 9,
+      until: (rows) => !rows?.has(id),
+    }),
+    Effect.map((rows) =>
+      rows?.has(id)
+        ? "file removed, but the Codex app still lists it; delete it in the app if it stays"
+        : undefined,
+    ),
+  );
+
+export const codexDesktop: HarnessDefinition = {
+  layer: Layer.effect(Harness, make),
+  doctor,
+  inventory: readEntries.pipe(Effect.map((entries) => entries.map(toLive))),
+  setEnabled: (id, enabled) =>
+    ownRecord(id).pipe(
+      Effect.flatMap((record) =>
+        writeText(
+          recordPath(id),
+          stringify({ ...record, status: enabled ? "ACTIVE" : "PAUSED", updated_at: Date.now() }),
+        ),
+      ),
+    ),
+  remove: (id) =>
+    ownRecord(id).pipe(
+      Effect.flatMap(() => removePath(join(automationsDir(), id))),
+      Effect.flatMap(() => confirmRemoved(id)),
+    ),
+};

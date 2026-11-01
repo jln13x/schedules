@@ -31,6 +31,8 @@ export const opencode: Agent = {
   label: "OpenCode",
   binaries: ["opencode"],
   setup: "https://opencode.ai/docs",
+  // external_directory is denied below full access.
+  confined: ["read", "edit"],
   // Without one, OpenCode silently uses its free hosted model.
   requiresModel: true,
   // Two OpenCode processes at once fail with "database is locked". Runs are queued, and a lock that

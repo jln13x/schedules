@@ -1,5 +1,5 @@
 import { expect, it, spyOn } from "bun:test";
-import { fetchSchedules, formatSearchResults, searchSchedules } from "./registry.ts";
+import { fetchSchedules, formatSearchResults, searchSkills } from "./registry.ts";
 
 const SCHEDULE = "---\nname: Morning brief\nschedule: 7 9 * * 1-5\n---\n\nReview today.\n";
 const SOURCE = { owner: "acme", repo: "ops" };
@@ -34,7 +34,9 @@ function mockGithub(
   });
 }
 
-it("aligns search results by source and install count", () => {
+const WEEKDAYS = { cron: "0 8 * * 1-5", label: "Every weekday at 08:00" };
+
+it("aligns search results by source and install count, with the suggested schedule", () => {
   expect(
     formatSearchResults([
       {
@@ -43,13 +45,21 @@ it("aligns search results by source and install count", () => {
         name: "morning-brief",
         displayName: "Morning brief",
         installs: 1200,
+        schedule: WEEKDAYS,
       },
-      { owner: "acme", repo: "ops", name: "triage", displayName: "TODO triage", installs: 95 },
+      {
+        owner: "acme",
+        repo: "ops",
+        name: "triage",
+        displayName: "TODO triage",
+        installs: 95,
+        schedule: { cron: "0 8 1 * *", label: "Every month on the 1st at 08:00" },
+      },
     ]),
   ).toBe(
     [
-      "acme/ops/morning-brief  1200 installs  Morning brief",
-      "acme/ops/triage           95 installs  TODO triage",
+      "acme/ops/morning-brief  1200 installs  Every weekday at 08:00  0 8 * * 1-5",
+      "acme/ops/triage           95 installs  Every month on the 1st at 08:00  0 8 1 * *",
     ].join("\n"),
   );
 });
@@ -59,12 +69,13 @@ it("strips terminal controls from every search field without changing the data",
     owner: "ac\u001bme",
     repo: "op\u009bs",
     name: "br\u0000ief",
-    displayName: "Morning\u0007 brief\u007f\r\n\tReview",
+    displayName: "Morning brief",
     installs: 12,
+    schedule: { cron: "0 8 * * 1-5", label: "Every\u0007 weekday\u007f\r\n\tat 08:00" },
   };
   const original = { ...result };
   expect(formatSearchResults([result])).toBe(
-    "acme/ops/brief  12 installs  Morning brief\n\tReview",
+    "acme/ops/brief  12 installs  Every weekday\n\tat 08:00  0 8 * * 1-5",
   );
   expect(result).toEqual(original);
 });
@@ -105,8 +116,6 @@ it("ignores download_url and builds raw URLs from the encoded default branch", a
           prompt: "Review today.",
         },
       ],
-      isPublic: true,
-      source: SOURCE,
     });
     expect(fetchMock).toHaveBeenCalledTimes(4);
   } finally {
@@ -226,7 +235,7 @@ it("follows a renamed repository's redirect only within GitHub's API", async () 
       repo: "old-name",
       name: "Morning brief",
     });
-    expect(fetched.source).toEqual({ owner: "acme", repo: "ops", name: "Morning brief" });
+    expect(fetched.schedules.map((schedule) => schedule.name)).toEqual(["Morning brief"]);
     expect(renamed.calls.slice(2)).toEqual([
       `${api}/repos/acme/ops/contents/.agents/schedules?ref=main`,
       "https://raw.githubusercontent.com/acme/ops/main/.agents/schedules/morning-brief.md",
@@ -312,7 +321,7 @@ it("sanitizes search errors", async () => {
     new Error("Search\u001b[31m failed\u007f"),
   );
   try {
-    await expect(searchSchedules("brief")).rejects.toThrow("Search[31m failed");
+    await expect(searchSkills("brief")).rejects.toThrow("Search[31m failed");
   } finally {
     fetchMock.mockRestore();
   }

@@ -12,11 +12,11 @@ interface Verified {
  * Null means no run has passed yet.
  */
 export const VERIFIED: Record<CommandLineAgent, Verified | null> = {
-  codex: { version: "0.165.0", date: "2026-10-28" },
-  "claude-code": { version: "2.1.312", date: "2026-10-28" },
-  "cursor-agent": { version: "2026.10.22", date: "2026-10-28" },
-  pi: { version: "1.4.0", date: "2026-10-28" },
-  opencode: { version: "1.19.5", date: "2026-10-28" },
+  codex: { version: "0.166.0", date: "2026-11-01" },
+  "claude-code": { version: "2.1.316", date: "2026-11-01" },
+  "cursor-agent": { version: "2026.10.22", date: "2026-11-01" },
+  pi: { version: "1.4.0", date: "2026-11-01" },
+  opencode: { version: "1.19.5", date: "2026-11-01" },
 };
 
 export const versionNumber = (output: string | undefined) => output?.match(/\d+(?:\.\d+)+/)?.[0];

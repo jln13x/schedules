@@ -35,6 +35,14 @@ You are verifying the `agent-schedules` CLI on this machine, end to end, for eve
      - `verify-<agent>-read`, prompt: `Create a file named verify-<agent>-read.txt in the repository root containing the word ok. Whether or not that worked, then reply with the single line SCHEDULES-VERIFY-<agent>-read.` A read run is expected to refuse or fail the write; it should still reply.
      - `verify-<agent>-edit`, same prompt with `edit` instead of `read`.
    - For `t3`, `codex-desktop` and `claude-desktop`, write one file each, `verify-<harness>`, prompt: `Reply with the single line SCHEDULES-VERIFY-<harness>. Do not change any files.`
+6. Install a skill whose answer only exists in a file beside it, and commit it, so worktrees have it too. Pick a random token `T`:
+   ```sh
+   mkdir -p .agents/skills/verify-skill
+   printf -- '---\nname: verify-skill\ndescription: Replies with the token in marker.md.\n---\n\nRead marker.md in this folder and reply with its single line. Do not change any files.\n' > .agents/skills/verify-skill/SKILL.md
+   echo "SCHEDULES-VERIFY-SKILL-T" > .agents/skills/verify-skill/marker.md
+   git add .agents/skills && git commit -qm "verify skill"
+   ```
+   For each testable harness, `$AS schedule verify-skill "M H * * <today>" --name verify-<harness>-skill`. It prints `create` and writes a file with `skill: verify-skill`.
 
 ## Checks per harness
 
@@ -61,19 +69,29 @@ Record PASS, FAIL or SKIP for every check, with the command and the relevant out
 14. **Crontab entry exists, then is gone after remove.** Before cleanup, confirm `crontab -l | grep agent-schedules` shows the job. After `$AS remove <agent> <names>`, the entries are gone, every line that isn't an agent-schedules entry is still there, and `list` shows nothing.
 15. **macOS only:** record any permission prompt the first push or a run shows, such as one asking to let the terminal administer the computer, and whether the run could still sign in to the agent.
 
+**Every harness, after the runs**
+
+16. **Skill resources.** The `verify-<harness>-skill` run replies with `SCHEDULES-VERIFY-SKILL-T`, which only `marker.md` holds, under the access it was pushed with (`read` for command-line agents). Record a harness whose permissions kept it from reading the file.
+17. **Pause survives a push and a run.** `$AS disable <harness> verify-<harness>-skill`; `list` shows `paused`. Move its minute by 1 and push it: it reports `update` and stays `paused` (for command-line agents, it is gone from `crontab -l`). Where `run-now` is supported, `$AS run-now <harness> verify-<harness>-skill` starts a run that replies with the token, and the task is still `paused` afterwards. Then `$AS enable <harness> verify-<harness>-skill` shows `active` again. Where a control isn't supported, it must be refused with a message saying what to do instead.
+18. **Rename keeps the task.** Change the skill schedule's `name:` to `verify-<harness>-renamed` and push. It reports `update`, `$AS list --all --json` shows one task with the new name and the same `id` as before, and nothing named `verify-<harness>-skill` is left.
+19. **Edits in the app aren't overwritten.** Where you can edit the task in the app (T3, Codex, Claude), change its prompt there, change the file's minute, and push: it reports a conflict and exits 1. `push --force` then replaces it.
+
 **t3**
 
 - Push with a model if the project has no default: `$AS doctor t3` lists them. Pick a cheap one.
 - The first push should add `$HOME/.agent-schedules-verify/repo` as a T3 project. Confirm it in the T3 Code app with computer use.
 - Confirm the task appears in T3's scheduled tasks, runs at `M H`, and its run shows the `SCHEDULES-VERIFY-t3` reply.
-- Clean up by deleting the task in the T3 app, and remove the `$HOME/.agent-schedules-verify/repo` project from T3 if the push added it.
+- Create one more task by hand in the T3 app for the verify project, named `verify-t3-adopted`. `$AS pull t3 verify-t3-adopted --adopt` writes its file; changing that file's minute and pushing reports `update` for the same task, not a new one.
+- If the T3 project's tasks can run in a worktree, set `verify-t3-renamed` to run in one in the app, push it again, and confirm the app still shows the worktree setting and the run still replies with the skill token.
+- Clean up with `$AS remove t3 <names>`, and remove the `$HOME/.agent-schedules-verify/repo` project from T3 if the push added it.
 
 **codex-desktop**
 
 - The Codex app must be open. The push output should say whether the app loaded the task. If it says it can't confirm, check whether `sqlite3` is installed and record that.
 - Confirm that the task appears on the app's Scheduled page, and that a run produces the reply. Computer use may refuse the Codex app; if so, ask the user to look and tell you what the app shows, and record that it came from them. If nobody can look, mark the app checks SKIP rather than pushing a task nobody can delete.
 - `$AS push codex-desktop --all --model x` must be rejected because the app picks its own model.
-- Clean up by deleting the automation in the Codex app, or asking the user to.
+- `$AS run-now codex-desktop verify-codex-desktop` must be refused with a message to use Run now in the app.
+- Clean up with `$AS remove codex-desktop <names>`; it says whether the app dropped each one. Confirm on the Scheduled page, or ask the user to.
 
 **claude-desktop**
 
@@ -82,22 +100,25 @@ Record PASS, FAIL or SKIP for every check, with the command and the relevant out
 - Record the permission-mode note the push printed. If the run waits for approval, record that, click **Run now**, and choose **Always allow** as the docs describe.
 - Confirm a run produces the reply, and that `$AS list claude-desktop` shows a last run.
 - `--access read` and `--model x` must both be rejected for this harness.
-- Clean up by deleting the task in the Claude app.
+- With the app open, `$AS disable claude-desktop verify-claude-desktop` must be refused with the quit message.
+- Clean up with `$AS remove claude-desktop <names>` while the app is closed, then confirm in the app that the tasks are gone.
 
 **Across harnesses**
 
-- `$AS remove t3 verify-t3` must be refused with a message that app tasks are removed in the app.
 - `$AS list` with no harness lists every harness that has tasks for `$HOME/.agent-schedules-verify/repo` and skips harnesses that aren't set up, without erroring.
-- `$AS list --all` from `/tmp` lists the command-line tasks with their repository.
+- `$AS list --all` from `/tmp` lists tasks from every harness with their workspace and id, including tasks made in the apps; listing starts no runs.
+- `$AS list --all --json` parses, has `"version": 1`, gives each `verify-*` task its `source` file and the `actions` its harness allows, and puts harnesses that aren't set up in `warnings` instead of failing.
+- `$AS remove <harness> <name> --delete-source` for a file pushed to two harnesses is refused and leaves both tasks and the file. `--dry-run` with it changes nothing.
+- If a second machine you may use is reachable over ssh with a key, `$AS push <agent> --all --ssh <host> --cwd <repo there>` works there, the host shows in `$AS hosts`, `$AS list --all` shows its tasks with the host, and `$AS remove <agent> <names> --ssh <host> --cwd <repo there>` cleans up. Otherwise SKIP.
 - `$AS push codex --global --all --dry-run` from inside `$HOME/.agent-schedules-verify/repo` reads `~/.agents/schedules` instead of the repo. Dry run only.
 - Docs drift: open https://schedules.sh/docs/harnesses and https://schedules.sh/docs/cli. List any statement that doesn't match what you observed.
 
 ## Cleanup
 
-1. `$AS remove <agent> <all verify names>` for every command-line agent you pushed to.
-2. Delete the `verify-*` tasks in T3 Code, the Codex app and the Claude app.
+1. `$AS remove <harness> <all verify names>` for every harness you pushed to, with the Claude app closed for `claude-desktop`.
+2. Confirm in T3 Code, the Codex app and the Claude app that no `verify-*` task is left, and delete any that is.
 3. Confirm no crontab entries remain (check 14), and `$AS list --all` shows no `verify-*` tasks.
-4. `rm -rf $HOME/.agent-schedules-verify/repo $HOME/.agent-schedules-verify/originals`.
+4. `rm -rf $HOME/.agent-schedules-verify/repo $HOME/.agent-schedules-verify/originals`, and `$AS hosts forget <host>` for a host added only for this run.
 
 ## Report
 
