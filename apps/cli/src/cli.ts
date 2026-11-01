@@ -1,14 +1,23 @@
 #!/usr/bin/env node
-import { execFile } from "node:child_process";
-import { homedir } from "node:os";
-import { join, relative, sep } from "node:path";
-import { promisify } from "node:util";
-import { isCancel, multiselect } from "@clack/prompts";
 import { Argument, Command, Option } from "commander";
 import { Effect } from "effect";
 import { description, version } from "../package.json";
-import { type LiveSchedule, Workspace, connect as connectHarness, run } from "./harness.ts";
+import { Workspace, run } from "./harness.ts";
+import { control } from "./controls.ts";
+import {
+  ACCESS,
+  COMMAND_LINE_AGENTS,
+  DEFINITIONS,
+  HARNESSES,
+  type HarnessName as Harness,
+  runJob,
+} from "./harnesses/index.ts";
+import { list } from "./inventory.ts";
+import { display, location } from "./location.ts";
+import { forgetHost, readHosts, rememberHost } from "./registrations.ts";
 import { fetchSchedules, formatSearchResults, parseSource, searchSkills } from "./registry.ts";
+import { checkHost, runRemote } from "./remote.ts";
+import { createReport, line } from "./report.ts";
 import {
   SCHEDULES_DIR,
   type Schedule,
@@ -17,37 +26,16 @@ import {
   readSchedules,
   sameSchedule,
   schedulePath,
-  slug,
   timingFromCron,
   writeSchedule,
 } from "./schedule.ts";
 import { isCommitted, resolveSkill, skillPrompt } from "./skills.ts";
-import {
-  ACCESS,
-  type Access,
-  DEFINITIONS,
-  HARNESSES,
-  type HarnessName as Harness,
-  COMMAND_LINE_AGENTS,
-  isCommandLine,
-  listJobs,
-  removeJob,
-  runJob,
-} from "./harnesses/index.ts";
+import { type SyncOptions, sync } from "./sync.ts";
 
 interface Options {
   readonly global: boolean;
   readonly dryRun: boolean;
 }
-
-interface SyncOptions extends Options {
-  readonly all: boolean;
-  readonly model?: string;
-  readonly access?: Access;
-}
-
-const execFileAsync = promisify(execFile);
-const git = async (...args: Array<string>) => (await execFileAsync("git", args)).stdout.trim();
 
 const exitWithMessage = (error: unknown) => {
   const cause =
@@ -58,56 +46,6 @@ const exitWithMessage = (error: unknown) => {
 };
 process.on("uncaughtException", exitWithMessage);
 process.on("unhandledRejection", exitWithMessage);
-
-async function location(global: boolean) {
-  const checkout = global ? null : await git("rev-parse", "--show-toplevel").catch(() => null);
-  // Worktrees share one repository, and schedulers know it by its main checkout, which git lists
-  // first.
-  const main =
-    checkout === null
-      ? null
-      : await git("worktree", "list", "--porcelain")
-          .then((list) => list.split("\n")[0]?.replace(/^worktree /, "") || null)
-          .catch(() => null);
-  return {
-    cwd: checkout === null ? homedir() : (main ?? checkout),
-    dir: join(checkout ?? homedir(), SCHEDULES_DIR),
-    checkout,
-  };
-}
-
-const display = (path: string) => {
-  const local = relative(process.cwd(), path);
-
-  if (!local.startsWith("..")) {
-    return local;
-  }
-
-  return path.startsWith(homedir() + sep) ? `~${path.slice(homedir().length)}` : path;
-};
-
-const line = (action: string, name: string, detail = "") =>
-  console.log(`${action.padEnd(10)}${name}${detail ? ` - ${detail}` : ""}`);
-
-function createReport() {
-  let unchanged = 0;
-  let failed = 0;
-  return {
-    line,
-    unchanged: () => {
-      unchanged += 1;
-    },
-    fail: (name: string, reason: unknown, label = "conflict") => {
-      line(label, name, reason instanceof Error ? reason.message : String(reason));
-      failed += 1;
-    },
-    failed: () => failed > 0,
-    finish: (dryRun: boolean) => {
-      console.log(`${unchanged} unchanged${dryRun ? " (dry run, nothing written)" : ""}`);
-      process.exit(failed > 0 ? 1 : 0);
-    },
-  };
-}
 
 async function search(words: ReadonlyArray<string>) {
   const results = await searchSkills(words.join(" "));
@@ -221,361 +159,37 @@ async function add(value: string, { global, dryRun }: Options) {
   report.finish(dryRun);
 }
 
-const workspace = (cwd: string, options: Pick<SyncOptions, "model" | "access"> = {}) => ({
-  cwd,
-  model: options.model,
-  access: options.access,
-});
-
-const connect = (harness: Harness, cwd: string, options?: Pick<SyncOptions, "model" | "access">) =>
-  connectHarness(DEFINITIONS[harness], workspace(cwd, options));
-
-type Plan =
-  | { readonly name: string; readonly action: "create" | "update"; readonly schedule: Schedule }
-  | { readonly name: string; readonly action: "unchanged" }
-  | { readonly name: string; readonly action: "skip"; readonly reason: string }
-  | { readonly name: string; readonly action: "conflict"; readonly reason: string };
-
-const sameSlug = (query: string, name: string) => {
-  try {
-    return slug(query) === slug(name);
-  } catch {
-    return false;
-  }
-};
-
-/** What a query names: the exact name, or else the one item with that filename form. */
-function matching<T extends { readonly name: string }>(
-  query: string,
-  items: ReadonlyArray<T>,
-): ReadonlyArray<T> {
-  const exact = items.filter((item) => item.name === query);
-  const found = exact.length > 0 ? exact : items.filter((item) => sameSlug(query, item.name));
-
-  if (found.length > 1) {
-    throw new Error(
-      `${query} could mean ${found.map((item) => item.name).join(" or ")}; use the exact name`,
-    );
-  }
-
-  return found;
-}
-
-async function choose(
-  command: "pull" | "push",
-  plans: ReadonlyArray<Plan>,
-  names: ReadonlyArray<string>,
-  { all, dryRun }: SyncOptions,
-): Promise<ReadonlyArray<Plan>> {
-  if (names.length > 0) {
-    const named = names.map((query) => [query, matching(query, plans)] as const);
-    const unknown = named.filter(([, found]) => found.length === 0).map(([query]) => query);
-
-    if (unknown.length > 0) {
-      throw new Error(`no schedule named ${unknown.join(", ")}`);
-    }
-
-    return plans.filter((plan) => named.some(([, found]) => found.includes(plan)));
-  }
-
-  const changes = plans.filter((plan) => "schedule" in plan);
-
-  if (all || dryRun || changes.length === 0) {
-    return plans;
-  }
-
-  if (!process.stdin.isTTY) {
-    throw new Error(`no terminal to ask which schedules to ${command}; pass --all or their names`);
-  }
-
-  const picked = await multiselect({
-    message: `Which schedules should ${command} ${command === "push" ? "send" : "write"}?`,
-    options: changes.map((plan) => ({
-      value: plan.name,
-      label: plan.name,
-      hint: `${plan.action === "create" ? "new" : "changed"}, ${"schedule" in plan ? describeTiming(plan.schedule.timing) : ""}`,
-    })),
-    initialValues: changes.map((plan) => plan.name),
-    required: false,
-  });
-
-  if (isCancel(picked)) {
-    console.log("Cancelled.");
-    process.exit(0);
-  }
-
-  return plans.filter((plan) => !("schedule" in plan) || picked.includes(plan.name));
-}
-
-async function sync(
-  command: "pull" | "push",
-  harness: Harness,
-  names: ReadonlyArray<string>,
-  options: SyncOptions,
-) {
-  if (options.model !== undefined && harness !== "t3" && !isCommandLine(harness)) {
-    throw new Error(`--model isn't supported for ${harness}; the app uses its own default`);
-  }
-
-  if (options.access !== undefined && !isCommandLine(harness)) {
-    throw new Error(
-      `--access is for ${COMMAND_LINE_AGENTS.join(", ")}; ${harness} runs tasks itself`,
-    );
-  }
-
-  const { cwd, dir } = await location(options.global);
-  const files = await readSchedules(dir);
-  const report = createReport();
-  const adapter = await connect(harness, cwd, options);
-  const live = await Effect.runPromise(adapter.list);
-  const sharedNames = new Set(
-    live.map((task) => task.name).filter((name, index, names) => names.indexOf(name) !== index),
-  );
-  const shared = `several ${harness} tasks share this name`;
-
-  const plans: ReadonlyArray<Plan> =
-    command === "pull"
-      ? live.map((task): Plan => {
-          if (sharedNames.has(task.name)) {
-            return { name: task.name, action: "conflict", reason: shared };
-          }
-
-          if ("unsupported" in task) {
-            return { name: task.name, action: "skip", reason: task.unsupported };
-          }
-
-          const file = files.find((candidate) => candidate.schedule.name === task.name);
-
-          if (file && sameSchedule(file.schedule, task.schedule)) {
-            return { name: task.name, action: "unchanged" };
-          }
-
-          return {
-            name: task.name,
-            action: file ? "update" : "create",
-            // The harness doesn't know which skill the prompt runs; the file still does.
-            schedule: { ...task.schedule, skill: file?.schedule.skill },
-          };
-        })
-      : files.map(({ schedule }): Plan => {
-          const task = live.find((candidate) => candidate.name === schedule.name);
-
-          if (sharedNames.has(schedule.name)) {
-            return { name: schedule.name, action: "conflict", reason: shared };
-          }
-
-          if (task && "unsupported" in task) {
-            return {
-              name: schedule.name,
-              action: "conflict",
-              reason: `the ${harness} task is not managed: ${task.unsupported}`,
-            };
-          }
-
-          const settled =
-            task &&
-            task.status !== "not scheduled" &&
-            (options.access === undefined || task.access === options.access) &&
-            (options.model === undefined || task.model === options.model);
-
-          if (task && settled && sameSchedule(task.schedule, schedule)) {
-            return { name: schedule.name, action: "unchanged" };
-          }
-
-          return { name: schedule.name, action: task ? "update" : "create", schedule };
-        });
-
-  const chosen = await choose(command, plans, names, options);
-  // Includes files created during this run, so two names with the same slug cannot share a file.
-  const written: Array<ScheduleFile> = [...files];
-  let prepared = false;
-  for (const plan of chosen) {
-    if (plan.action === "unchanged") {
-      report.unchanged();
-      continue;
-    }
-
-    if (plan.action === "skip") {
-      report.line("skip", plan.name, plan.reason);
-      continue;
-    }
-
-    if (plan.action === "conflict") {
-      report.fail(plan.name, plan.reason);
-      continue;
-    }
-
-    try {
-      if (command === "pull") {
-        const path = schedulePath(dir, written, plan.name);
-
-        if (!options.dryRun) {
-          await writeSchedule(path, plan.schedule);
-        }
-
-        written.push({ path, schedule: plan.schedule });
-        report.line(plan.action, plan.name, display(path));
-        continue;
-      }
-
-      const problem = await Effect.runPromise(
-        adapter.check(plan.schedule, plan.action === "update"),
-      );
-
-      if (problem) {
-        report.fail(plan.name, problem, "blocked");
-        continue;
-      }
-
-      if (!prepared) {
-        prepared = true;
-        for (const step of adapter.setup) {
-          report.line("create", step.description);
-
-          if (!options.dryRun) {
-            await Effect.runPromise(step.run);
-          }
-        }
-
-        if (adapter.caveat) {
-          console.log(`note      ${adapter.caveat}`);
-        }
-      }
-
-      const note = options.dryRun
-        ? undefined
-        : await Effect.runPromise(adapter.save(plan.schedule));
-      const file = files.find((candidate) => candidate.schedule.name === plan.name);
-      report.line(
-        plan.action,
-        plan.name,
-        [file && display(file.path), note].filter(Boolean).join(", "),
-      );
-    } catch (error) {
-      report.fail(plan.name, error);
-    }
-  }
-
-  report.finish(options.dryRun);
-}
-
 async function doctor(harness: Harness, { global }: Pick<Options, "global">) {
   const { cwd, dir } = await location(global);
   const files = await readSchedules(dir);
   console.log(`schedules ${display(dir)}: ${files.length} files`);
   const lines = await run(
-    DEFINITIONS[harness].doctor.pipe(Effect.provideService(Workspace, workspace(cwd))),
+    DEFINITIONS[harness].doctor.pipe(Effect.provideService(Workspace, { cwd })),
   ).catch((error: Error) => [`check failed: ${error.message}`]);
   for (const [index, line] of lines.entries()) {
     console.log(`${(index === 0 ? harness : "").padEnd(Math.max(10, harness.length + 2))}${line}`);
   }
 }
 
-const when = (date: Date) =>
-  date.toLocaleString("en", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-
-function table(rows: ReadonlyArray<ReadonlyArray<string>>) {
-  const widths =
-    rows[0]?.map((_, column) => Math.max(...rows.map((row) => row[column]?.length ?? 0))) ?? [];
-  for (const row of rows) {
-    console.log(
-      row
-        .map((cell, column) => cell.padEnd(widths[column] ?? 0))
-        .join("  ")
-        .trimEnd(),
-    );
-  }
-}
-
-const lastRunCell = ({ lastRun }: LiveSchedule) =>
-  lastRun === undefined ? "-" : `${lastRun.outcome ?? "started"}, ${when(lastRun.at)}`;
-
-async function list(
-  harness: Harness | undefined,
-  { global, all }: { global: boolean; all: boolean },
-) {
-  const { cwd } = await location(global);
-  // Every repository means every one this CLI schedules runs for; the apps are listed per repository.
-  const targets: ReadonlyArray<readonly [Harness, string]> = all
-    ? [...new Set((await run(listJobs)).map((job) => `${job.agent}\0${job.cwd}`))]
-        .map((key) => key.split("\0") as [Harness, string])
-        .filter(([agent]) => !harness || agent === harness)
-    : HARNESSES.filter((name) => !harness || name === harness).map((name) => [name, cwd] as const);
-
-  const rows: Array<Array<string>> = [];
-  const skipped: Array<string> = [];
-  for (const [name, repository] of targets) {
-    const tasks = await connect(name, repository)
-      .then((adapter) => Effect.runPromise(adapter.list))
-      .catch((error: Error) => {
-        // Without a harness named, the ones that aren't set up here are skipped, but said so.
-        if (harness) {
-          throw error;
-        }
-
-        skipped.push(name);
-        return [];
-      });
-    for (const task of tasks) {
-      rows.push([
-        name,
-        task.name,
-        "schedule" in task ? describeTiming(task.schedule.timing) : task.unsupported,
-        task.status,
-        lastRunCell(task),
-        ...(all ? [display(repository)] : []),
-      ]);
+async function hosts(action: string | undefined, host: string | undefined) {
+  if (action === "forget") {
+    if (!host) {
+      throw new Error("name the host to forget");
     }
+
+    await run(forgetHost(host));
+    line("forget", host);
+    return;
   }
 
-  if (rows.length === 0) {
-    console.log(
-      all ? "No scheduled runs on this machine." : `Nothing scheduled for ${display(cwd)}.`,
-    );
-  } else {
-    table([
-      ["HARNESS", "NAME", "WHEN", "STATUS", "LAST RUN", ...(all ? ["REPOSITORY"] : [])],
-      ...rows,
-    ]);
+  if (action !== undefined) {
+    throw new Error(`hosts takes no argument, or forget <host>`);
   }
 
-  if (skipped.length > 0) {
-    console.error(`skipped ${skipped.join(", ")}: not set up here, or unreadable; try doctor`);
-  }
-}
-
-async function remove(
-  harness: Harness,
-  names: ReadonlyArray<string>,
-  { global }: { global: boolean },
-) {
-  if (!isCommandLine(harness)) {
-    throw new Error(`${harness} keeps its own schedule; remove the task in the app`);
-  }
-
-  const { cwd } = await location(global);
-  const jobs = (await run(listJobs)).filter((job) => job.agent === harness && job.cwd === cwd);
-  let missing = 0;
-  for (const name of names) {
-    const [job] = matching(name, jobs);
-
-    if (job) {
-      await run(removeJob(job));
-      line("remove", job.name);
-    } else {
-      line("missing", name, `no ${harness} schedule with this name for ${display(cwd)}`);
-      missing += 1;
-    }
-  }
-
-  process.exit(missing > 0 ? 1 : 0);
+  const remembered = await run(readHosts);
+  console.log(
+    remembered.length === 0 ? "No remote hosts yet; pass --ssh to use one." : remembered.join("\n"),
+  );
 }
 
 const harnessArgument = (description = "the harness to sync with") =>
@@ -584,6 +198,14 @@ const GLOBAL = ["-g, --global", `use ~/${SCHEDULES_DIR} even inside a repository
 const DRY_RUN = ["--dry-run", "preview changes without writing anything"] as const;
 const ALL = ["-a, --all", "sync every schedule without asking"] as const;
 const NAMES = ["[names...]", "schedules to sync, by name; omit to choose from a list"] as const;
+const JSON_OUTPUT = ["--json", "print the result as JSON, for other tools"] as const;
+const ID = ["--id <id>", "pick one task by the id list --all shows, in any workspace"] as const;
+
+/** Options every command takes: where to run it. */
+const located = (command: Command) =>
+  command
+    .option("--ssh <host>", "run on this ssh host, which is remembered for list --all")
+    .option("--cwd <dir>", "run as if started in this folder");
 
 const program = new Command("agent-schedules")
   .description(description)
@@ -594,78 +216,160 @@ const program = new Command("agent-schedules")
     `\nInside a repository, schedules live in its ${SCHEDULES_DIR}. Outside one, or with --global, they\nlive in ~/${SCHEDULES_DIR} and run in your home folder.`,
   );
 
-program
-  .command("search")
-  .description("find skills worth scheduling on schedules.sh, best first")
-  .argument("[query...]", "words to match against names and descriptions")
-  .action(search);
+/**
+ * --ssh runs the same command on the host, with everything but --ssh passed on; --cwd moves into
+ * the folder first, here or there. A host is remembered once a command there succeeds.
+ */
+program.hook("preAction", async (_program, action) => {
+  const { ssh, cwd } = action.opts<{ ssh?: string; cwd?: string }>();
 
-program
-  .command("schedule")
-  .description(`run an installed skill on a schedule: writes its file in ${SCHEDULES_DIR}`)
-  .argument("<skill>", "the skill's name, owner/repo/skill, or the path to its folder")
-  .argument("<cron>", "when it runs, such as '0 8 * * 1-5' or '0 8 1 * *'")
-  .option("-n, --name <name>", "name the schedule, to run one skill at several times")
-  .option(...GLOBAL)
-  .option(...DRY_RUN)
-  .action(schedule);
+  if (ssh === undefined) {
+    if (cwd !== undefined) {
+      process.chdir(cwd);
+    }
 
-program
-  .command("add")
-  .description(`(deprecated) copy schedules from a public GitHub repository into ${SCHEDULES_DIR}`)
-  .argument("<source>", "owner/repo for all of its schedules, or owner/repo/name for one")
-  .option(...GLOBAL)
-  .option(...DRY_RUN)
-  .action(add);
+    return;
+  }
 
-program
-  .command("pull")
-  .description(`write the harness's scheduled tasks to ${SCHEDULES_DIR}`)
-  .addArgument(harnessArgument())
-  .argument(...NAMES)
-  .option(...ALL)
-  .option(...GLOBAL)
-  .option(...DRY_RUN)
-  .action((harness: Harness, names: Array<string>, options: SyncOptions) =>
-    sync("pull", harness, names, options),
+  checkHost(ssh);
+  const args = process.argv.slice(2);
+  const forwarded = args.filter(
+    (arg, index) => arg !== "--ssh" && args[index - 1] !== "--ssh" && !arg.startsWith("--ssh="),
+  );
+  const { code } = await runRemote(ssh, forwarded);
+
+  if (code === 0) {
+    await run(rememberHost(ssh));
+  }
+
+  process.exit(code);
+});
+
+located(
+  program
+    .command("search")
+    .description("find skills worth scheduling on schedules.sh, best first")
+    .argument("[query...]", "words to match against names and descriptions"),
+).action(search);
+
+located(
+  program
+    .command("schedule")
+    .description(`run an installed skill on a schedule: writes its file in ${SCHEDULES_DIR}`)
+    .argument("<skill>", "the skill's name, owner/repo/skill, or the path to its folder")
+    .argument("<cron>", "when it runs, such as '0 8 * * 1-5' or '0 8 1 * *'")
+    .option("-n, --name <name>", "name the schedule, to run one skill at several times")
+    .option(...GLOBAL)
+    .option(...DRY_RUN),
+).action(schedule);
+
+located(
+  program
+    .command("add")
+    .description(
+      `(deprecated) copy schedules from a public GitHub repository into ${SCHEDULES_DIR}`,
+    )
+    .argument("<source>", "owner/repo for all of its schedules, or owner/repo/name for one")
+    .option(...GLOBAL)
+    .option(...DRY_RUN),
+).action(add);
+
+located(
+  program
+    .command("pull")
+    .description(`write the harness's scheduled tasks to ${SCHEDULES_DIR}`)
+    .addArgument(harnessArgument())
+    .argument(...NAMES)
+    .option(...ALL)
+    .option("--adopt", "bind the files to their tasks, so later pushes update those tasks")
+    .option(...GLOBAL)
+    .option(...DRY_RUN),
+).action((harness: Harness, names: Array<string>, options: SyncOptions) =>
+  sync("pull", harness, names, options),
+);
+
+located(
+  program
+    .command("push")
+    .description(`create or update the harness's scheduled tasks from ${SCHEDULES_DIR}`)
+    .addArgument(harnessArgument())
+    .argument(...NAMES)
+    .option(...ALL)
+    .option(
+      "-m, --model <model>",
+      "model for the tasks this push creates or updates, such as codex/gpt-6-astra for t3",
+    )
+    .addOption(
+      new Option(
+        "--access <level>",
+        `what scheduled runs may do (${COMMAND_LINE_AGENTS.join(", ")})`,
+      )
+        .choices(ACCESS)
+        .default(undefined, "read for new tasks"),
+    )
+    .option("--force", "replace tasks that were changed in the harness since the last push")
+    .option(...GLOBAL)
+    .option(...DRY_RUN),
+).action((harness: Harness, names: Array<string>, options: SyncOptions) =>
+  sync("push", harness, names, options),
+);
+
+located(
+  program
+    .command("list")
+    .description("show what is scheduled, whether it is active, and its last run")
+    .addArgument(new Argument("[harness]", "only this harness").choices(HARNESSES))
+    .option(
+      "-a, --all",
+      "every task in every workspace, here and on the hosts --ssh has used, including ones made in the apps",
+    )
+    .option(...JSON_OUTPUT)
+    .addOption(new Option("--local-only").hideHelp())
+    .option(...GLOBAL),
+).action(list);
+
+const controlCommand = (
+  name: "enable" | "disable" | "run-now" | "remove",
+  summary: string,
+  extra: (command: Command) => Command = (command) => command,
+) =>
+  located(
+    extra(
+      program
+        .command(name)
+        .description(summary)
+        .addArgument(harnessArgument("the harness that has the tasks"))
+        .argument("[names...]", "the tasks, by name, in this repository")
+        .option(...ID)
+        .option(...JSON_OUTPUT)
+        .option(...GLOBAL)
+        .option(...DRY_RUN),
+    ),
+  ).action((harness: Harness, names: Array<string>, options) =>
+    control(name, harness, names, options),
   );
 
-program
-  .command("push")
-  .description(`create or update the harness's scheduled tasks from ${SCHEDULES_DIR}`)
-  .addArgument(harnessArgument())
-  .argument(...NAMES)
-  .option(...ALL)
-  .option(
-    "-m, --model <model>",
-    "model for the tasks this push creates or updates, such as codex/gpt-6-astra for t3",
-  )
-  .addOption(
-    new Option("--access <level>", `what scheduled runs may do (${COMMAND_LINE_AGENTS.join(", ")})`)
-      .choices(ACCESS)
-      .default(undefined, "read for new tasks"),
-  )
-  .option(...GLOBAL)
-  .option(...DRY_RUN)
-  .action((harness: Harness, names: Array<string>, options: SyncOptions) =>
-    sync("push", harness, names, options),
-  );
+controlCommand("enable", "resume paused tasks");
+controlCommand("disable", "pause tasks; pushes and one-off runs keep them paused");
+controlCommand("run-now", "start one run of each task now, without changing its schedule");
+controlCommand(
+  "remove",
+  "delete tasks from the harness and forget them; schedule files stay",
+  (command) =>
+    command
+      .alias("delete")
+      .option(
+        "--delete-source",
+        "delete the schedule file too, unless another task is pushed from it",
+      ),
+);
 
 program
-  .command("list")
-  .description("show what is scheduled, whether it is active, and its last run")
-  .addArgument(new Argument("[harness]", "only this harness").choices(HARNESSES))
-  .option("-a, --all", "every repository on this machine, for the harnesses this CLI schedules")
-  .option(...GLOBAL)
-  .action(list);
-
-program
-  .command("remove")
-  .description(`stop and delete scheduled runs (${COMMAND_LINE_AGENTS.join(", ")})`)
-  .addArgument(harnessArgument("the harness that runs them"))
-  .argument("<names...>", "the schedules to remove")
-  .option(...GLOBAL)
-  .action(remove);
+  .command("hosts")
+  .description("show the ssh hosts list --all reads, or forget one")
+  .argument("[action]", "forget")
+  .argument("[host]", "the host to forget")
+  .action(hosts);
 
 program
   .command("run", { hidden: true })
@@ -680,11 +384,12 @@ program
     process.exit(await run(runJob(id)));
   });
 
-program
-  .command("doctor")
-  .description("check a harness's setup, without changing anything")
-  .addArgument(harnessArgument("the harness to check"))
-  .option(...GLOBAL)
-  .action(doctor);
+located(
+  program
+    .command("doctor")
+    .description("check a harness's setup, without changing anything")
+    .addArgument(harnessArgument("the harness to check"))
+    .option(...GLOBAL),
+).action(doctor);
 
 await program.parseAsync();

@@ -94,10 +94,13 @@ describe.skipIf(process.platform === "win32")("scheduling with cron", () => {
     };
 
     expect(await run(adapter.check(schedule, false))).toBeUndefined();
-    expect(await run(adapter.save(schedule))).toBe("Weekdays 09:07 via cron, edit access");
+    const created = await run(adapter.save(schedule));
+    expect(created.note).toBe("Weekdays 09:07 via cron, edit access");
     expect(await run(adapter.list)).toEqual([
       {
+        id: created.id,
         name: "Morning brief",
+        workspace: cwd,
         status: "active",
         lastRun: undefined,
         model: undefined,

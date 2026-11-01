@@ -1,9 +1,11 @@
+import { spawn } from "node:child_process";
 import { isAbsolute, join, resolve } from "node:path";
 import { Effect, Layer, Option } from "effect";
 import {
   type HarnessDefinition,
   type LiveSchedule,
   type Platform,
+  type Saved,
   Harness,
   Workspace,
   execRaw,
@@ -33,7 +35,7 @@ import { cronJobIds, cronMissing, installCronJob, removeCronJob, runCommand } fr
 import { verifiedLine } from "../verified.ts";
 
 export { ACCESS, type Access } from "./agent.ts";
-export { type Job, listJobs, runJob } from "./jobs.ts";
+export { type Job, runJob } from "./jobs.ts";
 
 /** The jobs in the crontab, or undefined when there is no cron to ask. */
 const scheduledIds = cronMissing.pipe(
@@ -44,19 +46,19 @@ const toLive = (job: Job, installed: Set<string> | undefined) =>
   Effect.gen(function* () {
     const timing = timingFromCron(job.schedule);
     const last = yield* lastRun(job.id);
+    const prompt = yield* readText(promptPath(job.id));
     const base = {
+      id: job.id,
       name: job.name,
-      status: installed?.has(job.id) === false ? "not scheduled" : "active",
+      workspace: job.cwd,
+      status: job.paused ? "paused" : installed?.has(job.id) === false ? "not scheduled" : "active",
       lastRun: last && { at: new Date(last.finishedAt), outcome: last.outcome },
       model: job.model,
       access: job.access,
     } as const;
     return typeof timing === "string"
-      ? ({ ...base, unsupported: timing } satisfies LiveSchedule)
-      : ({
-          ...base,
-          schedule: { name: job.name, timing, prompt: yield* readText(promptPath(job.id)) },
-        } satisfies LiveSchedule);
+      ? ({ ...base, unsupported: timing, prompt } satisfies LiveSchedule)
+      : ({ ...base, schedule: { name: job.name, timing, prompt } } satisfies LiveSchedule);
   });
 
 const findBinary = (agent: CommandLineAgent) =>
@@ -88,7 +90,7 @@ function makeHarness(agent: CommandLineAgent) {
     const missing = yield* cronMissing;
     const binary = yield* findBinary(agent);
 
-    const save = Effect.fn(function* (schedule: Schedule) {
+    const save = Effect.fn(function* (schedule: Schedule, target?: string) {
       if (missing) {
         return yield* fail(missing);
       }
@@ -97,7 +99,13 @@ function makeHarness(agent: CommandLineAgent) {
         return yield* fail(notOnPath(agent));
       }
 
-      const existing = (yield* mine).find((job) => job.name === schedule.name);
+      const existing = (yield* mine).find((job) =>
+        target === undefined ? job.name === schedule.name : job.id === target,
+      );
+
+      if (target !== undefined && !existing) {
+        return yield* fail(`no ${agent} job ${target} for ${cwd} any more`);
+      }
       const id = existing?.id ?? jobId(agent, cwd, schedule.name);
       const model = requested ?? existing?.model;
       const home = runnerHome();
@@ -133,15 +141,23 @@ function makeHarness(agent: CommandLineAgent) {
         binary: isAbsolute(binary) ? binary : resolve(binary),
         path: process.env.PATH ?? "",
         updatedAt: new Date().toISOString(),
+        ...(existing?.paused ? { paused: true } : {}),
       };
+
       // cron goes first: if it refuses, the saved state still describes what it runs.
-      yield* installCronJob(job, yield* runCommand(id));
+      if (!job.paused) {
+        yield* installCronJob(job, yield* runCommand(id));
+      }
+
       // Prompts and logs can hold anything the agent was told or printed, so they stay private.
       yield* makeDirectory(jobDir(id), 0o700);
       yield* writeText(promptPath(id), schedule.prompt, 0o600);
       yield* writeJsonAtomic(join(jobDir(id), "job.json"), job);
       const limit = spec.limits?.[job.access];
-      return `${describeTiming(schedule.timing)} via cron, ${job.access} access${limit ? ` (${limit})` : ""}`;
+      return {
+        id,
+        note: `${describeTiming(schedule.timing)} via cron, ${job.access} access${limit ? ` (${limit})` : ""}${job.paused ? ", still paused" : ""}`,
+      } satisfies Saved;
     });
 
     const check = Effect.fn(function* (schedule: Schedule) {
@@ -167,7 +183,7 @@ function makeHarness(agent: CommandLineAgent) {
         return yield* Effect.forEach(yield* mine, (job) => toLive(job, installed));
       }).pipe(Effect.provideContext(services)),
       check: (schedule) => check(schedule).pipe(Effect.provideContext(services)),
-      save: (schedule) => save(schedule).pipe(Effect.provideContext(services)),
+      save: (schedule, id) => save(schedule, id).pipe(Effect.provideContext(services)),
     });
   });
 }
@@ -180,6 +196,42 @@ export const removeJob = (job: Job) =>
     }
 
     yield* removePath(jobDir(job.id));
+  });
+
+const findJob = (agent: CommandLineAgent, id: string) =>
+  listJobs.pipe(
+    Effect.map((jobs) => jobs.find((job) => job.agent === agent && job.id === id)),
+    Effect.flatMap((job) => (job ? Effect.succeed(job) : fail(`no ${agent} job ${id}`))),
+  );
+
+/** Takes a job out of the crontab, or puts it back, and remembers which in its settings. */
+const setEnabled = (agent: CommandLineAgent) => (id: string, enabled: boolean) =>
+  Effect.gen(function* () {
+    const job = yield* findJob(agent, id);
+    const missing = yield* cronMissing;
+
+    if (missing) {
+      return yield* fail(missing);
+    }
+
+    const { paused: _paused, ...rest } = job;
+    const next: Job = enabled ? rest : { ...rest, paused: true };
+    yield* enabled ? installCronJob(next, yield* runCommand(id)) : removeCronJob(id);
+    yield* writeJsonAtomic(join(jobDir(id), "job.json"), next);
+  });
+
+/**
+ * Starts the job the way cron does, in the background, so it takes the same locks and records its
+ * outcome where list reads it. A paused job runs once and stays paused.
+ */
+const runNow = (agent: CommandLineAgent) => (id: string) =>
+  Effect.gen(function* () {
+    const job = yield* findJob(agent, id);
+    const [command = "", ...args] = yield* runCommand(job.id);
+    yield* Effect.sync(() =>
+      spawn(command, args, { cwd: job.cwd, detached: true, stdio: "ignore" }).unref(),
+    );
+    return "started in the background; list shows how it went";
   });
 
 function doctor(agent: CommandLineAgent) {
@@ -231,4 +283,12 @@ function doctor(agent: CommandLineAgent) {
 export const cronHarness = (agent: CommandLineAgent): HarnessDefinition => ({
   layer: Layer.effect(Harness, makeHarness(agent)),
   doctor: doctor(agent),
+  inventory: Effect.gen(function* () {
+    const installed = yield* scheduledIds;
+    const jobs = (yield* listJobs).filter((job) => job.agent === agent);
+    return yield* Effect.forEach(jobs, (job) => toLive(job, installed));
+  }),
+  setEnabled: setEnabled(agent),
+  runNow: runNow(agent),
+  remove: (id) => findJob(agent, id).pipe(Effect.flatMap(removeJob), Effect.as(undefined)),
 });
