@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installedSkills, resolveSkill, skillPrompt } from "./skills.ts";
+import { installedSkills, resolveSkill, skillOutsideRepository, skillPrompt } from "./skills.ts";
 
 const CLI = fileURLToPath(new URL("cli.ts", import.meta.url));
 let root: string;
@@ -139,4 +139,30 @@ describe("schedule", () => {
   test("rejects a cron the format can't hold before looking for the skill", () => {
     expect(() => schedule("nothing", "*/5 * * * *")).toThrow("not a time of day");
   });
+});
+
+const promptFor = (path: string) =>
+  skillPrompt({ name: "x", folder: "x", dir: "/x", path, scope: "global" });
+
+test("a skill outside the repository is found in the prompt schedule wrote", () => {
+  const timing = { minute: 0, hour: 8, weekdays: null };
+  expect(
+    skillOutsideRepository({
+      name: "x",
+      timing,
+      prompt: promptFor("~/.agents/skills/x"),
+      skill: "x",
+    }),
+  ).toBe("~/.agents/skills/x");
+  expect(
+    skillOutsideRepository({
+      name: "x",
+      timing,
+      prompt: promptFor(".agents/skills/x"),
+      skill: "x",
+    }),
+  ).toBeUndefined();
+  expect(
+    skillOutsideRepository({ name: "x", timing, prompt: promptFor("~/.agents/skills/x") }),
+  ).toBeUndefined();
 });

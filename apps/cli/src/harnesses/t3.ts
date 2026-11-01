@@ -5,6 +5,7 @@ import {
   type HarnessDefinition,
   type LiveSchedule,
   type Platform,
+  type Saved,
   type SetupStep,
   Harness,
   HarnessError,
@@ -350,6 +351,48 @@ const connect = Effect.gen(function* () {
 
 const modelId = (selection: ModelSelection) => `${selection.instanceId}/${selection.model}`;
 
+const tasksSchema = Schema.Struct({ tasks: Schema.Array(taskSchema) });
+const mutationSchema = Schema.Struct({ task: Schema.Struct({ id: Schema.String }) });
+const decodeStrategy = Schema.decodeUnknownOption(Schema.Struct({ type: Schema.String }));
+
+/** A T3 task as the CLI shows it, with the settings a push keeps spelled out. */
+const toLive = (task: Task, workspace: string | undefined): LiveSchedule => {
+  const timing = fromT3Schedule(task.schedule);
+  const status = task.enabled ? "active" : "paused";
+  const lastRun = fromT3LastRun(task);
+  const model = Option.map(decodeModelSelection(task.modelSelection), modelId).pipe(
+    Option.getOrUndefined,
+  );
+  const strategy = Option.map(decodeStrategy(task.workspaceStrategy), (value) => value.type).pipe(
+    Option.getOrUndefined,
+  );
+  const settings = {
+    trigger: task.schedule.type,
+    runtimeMode: task.runtimeMode,
+    interactionMode: task.interactionMode,
+    ...(strategy === undefined ? {} : { workspaceStrategy: strategy }),
+    ...(task.threadId === null ? {} : { thread: task.threadId }),
+  };
+  const base = {
+    id: task.id,
+    name: task.title,
+    status,
+    workspace,
+    lastRun,
+    model,
+    settings,
+  } as const;
+  return typeof timing === "string"
+    ? { ...base, unsupported: timing, prompt: task.prompt }
+    : { ...base, schedule: { name: task.title, timing, prompt: task.prompt } };
+};
+
+const listTasks = (rpc: Effect.Success<typeof connect>["rpc"]) =>
+  rpc("scheduledTasks.list", {}).pipe(
+    Effect.flatMap((body) => decode(tasksSchema, body, "T3 scheduled tasks")),
+    Effect.map(({ tasks }) => tasks),
+  );
+
 const modelSelection = (id: string, available: ReadonlyArray<string>) => {
   const [instanceId = "", ...rest] = id.split("/");
   return !available.includes(id) || rest.length === 0
@@ -377,12 +420,7 @@ const make = Effect.gen(function* () {
     }
 
     const { id } = project;
-    const { tasks: all } = yield* decode(
-      Schema.Struct({ tasks: Schema.Array(taskSchema) }),
-      yield* rpc("scheduledTasks.list", {}),
-      "T3 scheduled tasks",
-    );
-    tasks = all.filter((task) => task.projectId === id);
+    tasks = (yield* listTasks(rpc)).filter((task) => task.projectId === id);
     return tasks;
   });
 
@@ -392,25 +430,6 @@ const make = Effect.gen(function* () {
         `no model for new T3 tasks: pass --model, for example --model ${example}, or set a default model on the T3 project (run agent-schedules doctor t3 for the list)`,
     ),
   );
-
-  const toLive = (task: Task): LiveSchedule => {
-    const timing = fromT3Schedule(task.schedule);
-    const status = task.enabled ? "active" : "paused";
-    const lastRun = fromT3LastRun(task);
-    const model = Option.map(
-      decodeModelSelection(task.modelSelection),
-      (selection) => `${selection.instanceId}/${selection.model}`,
-    ).pipe(Option.getOrUndefined);
-    return typeof timing === "string"
-      ? { name: task.title, status, lastRun, model, unsupported: timing }
-      : {
-          name: task.title,
-          status,
-          lastRun,
-          model,
-          schedule: { name: task.title, timing, prompt: task.prompt },
-        };
-  };
 
   const addProject: SetupStep = {
     description: `T3 project for ${cwd}`,
@@ -424,7 +443,7 @@ const make = Effect.gen(function* () {
     }).pipe(Effect.provideContext(services)),
   };
 
-  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule) {
+  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule, id?: string) {
     if (timing.monthDay !== undefined) {
       return yield* fail(MONTHLY);
     }
@@ -433,7 +452,15 @@ const make = Effect.gen(function* () {
       return yield* fail(`No T3 project for ${cwd}`);
     }
 
-    const existing = (tasks ?? (yield* loadTasks)).find((task) => task.title === name);
+    const current = tasks ?? (yield* loadTasks);
+    const existing =
+      id === undefined
+        ? current.find((task) => task.title === name)
+        : current.find((task) => task.id === id);
+
+    if (id !== undefined && !existing) {
+      return yield* fail(`T3 has no task ${id} in this project any more`);
+    }
     const definition = {
       title: name,
       prompt,
@@ -443,7 +470,6 @@ const make = Effect.gen(function* () {
 
     if (existing) {
       const {
-        id,
         enabled,
         createdBy,
         creationSource,
@@ -455,7 +481,7 @@ const make = Effect.gen(function* () {
       } = existing;
       yield* rpc("scheduledTasks.upsert", {
         ...definition,
-        id,
+        id: existing.id,
         enabled,
         requireExisting: true,
         createdBy,
@@ -466,7 +492,7 @@ const make = Effect.gen(function* () {
         runtimeMode,
         interactionMode,
       });
-      return undefined;
+      return { id: existing.id } satisfies Saved;
     }
 
     const selection = model();
@@ -476,7 +502,7 @@ const make = Effect.gen(function* () {
     }
 
     // Unattended runs cannot answer approval prompts.
-    yield* rpc("scheduledTasks.upsert", {
+    const created = yield* rpc("scheduledTasks.upsert", {
       ...definition,
       enabled: true,
       threadId: null,
@@ -484,13 +510,13 @@ const make = Effect.gen(function* () {
       modelSelection: selection,
       runtimeMode: "full-access",
       interactionMode: "default",
-    });
-    return undefined;
+    }).pipe(Effect.flatMap((body) => decode(mutationSchema, body, "T3 scheduledTasks.upsert")));
+    return { id: created.task.id } satisfies Saved;
   });
 
   return Harness.of({
     setup: project ? [] : [addProject],
-    list: loadTasks.pipe(Effect.map((all) => all.map(toLive))),
+    list: loadTasks.pipe(Effect.map((all) => all.map((task) => toLive(task, cwd)))),
     check: (schedule, existing) =>
       schedule.timing.monthDay !== undefined
         ? Effect.succeed(MONTHLY)
@@ -561,4 +587,25 @@ const doctor = Effect.gen(function* () {
   ];
 });
 
-export const t3: HarnessDefinition = { layer: Layer.effect(Harness, make), doctor };
+/** Every T3 task, each with the folder of the project it belongs to. */
+const inventory = Effect.gen(function* () {
+  const { rpc, projects } = yield* connect;
+  const [all, known] = yield* Effect.all([listTasks(rpc), projects], { concurrency: 2 });
+  const roots = new Map(known.map((project) => [project.id, project.workspaceRoot]));
+  return all.map((task) => toLive(task, roots.get(task.projectId)));
+});
+
+/** One call on T3's own task API; it keeps everything else about the task as it is. */
+const call = (tag: string, payload: unknown) =>
+  connect.pipe(Effect.flatMap(({ rpc }) => rpc(tag, payload)));
+
+export const t3: HarnessDefinition = {
+  layer: Layer.effect(Harness, make),
+  doctor,
+  inventory,
+  setEnabled: (id, enabled) =>
+    call("scheduledTasks.setEnabled", { id, enabled }).pipe(Effect.asVoid),
+  // T3 runs the task once and leaves its enabled state alone.
+  runNow: (id) => call("scheduledTasks.runNow", { id }).pipe(Effect.as("started in T3")),
+  remove: (id) => call("scheduledTasks.delete", { id }).pipe(Effect.as(undefined)),
+};

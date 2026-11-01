@@ -103,7 +103,7 @@ async function jobFor(agent: Agent, name: string) {
 
 interface Row {
   agent: Agent;
-  variant: "read" | "edit";
+  variant: "read" | "edit" | "skill" | "global";
   result: "PASS" | "FAIL" | "SKIP";
   detail: string;
 }
@@ -228,6 +228,95 @@ for (const agent of agents) {
               .map((line) => `      | ${line}`)
               .join("\n")}`,
     });
+  }
+}
+
+/**
+ * Schedules an installed skill with `schedule` and runs it at read access, the default. Its answer
+ * is only in a file beside SKILL.md, so a reply with it shows the agent read the skill's resources
+ * under the permissions a scheduled run gets: from the repository, or from ~/.agents/skills.
+ */
+async function skillRun(agent: Agent, scope: "skill" | "global", model: string | undefined) {
+  const token = `SCHEDULES-VERIFY-SKILL-${agent}-${scope}-${Math.random().toString(36).slice(2, 8)}`;
+  const folder = `verify-${scope}-${agent}`;
+  const dir =
+    scope === "skill"
+      ? join(repo, ".agents/skills", folder)
+      : join(homedir(), ".agents/skills", folder);
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, "SKILL.md"),
+    `---\nname: ${folder}\ndescription: Replies with the line in marker.md.\n---\n\nRead marker.md in this folder and reply with its single line. Do not change any files.\n`,
+  );
+  await writeFile(join(dir, "marker.md"), `${token}\n`);
+
+  // Committed, as a team would, so the skill is there for every checkout.
+  if (scope === "skill") {
+    await git("add", ".agents/skills");
+    await git("commit", "-q", "-m", folder);
+  }
+
+  const name = `verify-${agent}-${scope}`;
+  const scheduled = await cli(["schedule", dir, "0 9 * * 1", "--name", name]);
+  const push =
+    scheduled.exitCode === 0
+      ? await cli(["push", agent, name, ...(model ? ["--model", model] : [])])
+      : scheduled;
+
+  // Agents confined to the repository at read access must refuse a global skill up front, rather
+  // than push a task whose every run fails.
+  if (scope === "global" && AGENTS[agent].confined?.includes("read")) {
+    return push.exitCode !== 0 && push.output.includes("can't read files outside the repository")
+      ? { result: "PASS" as const, detail: "push refused the global skill, as expected" }
+      : {
+          result: "FAIL" as const,
+          detail: `push should refuse a global skill: ${push.output.split("\n").at(-1)}`,
+        };
+  }
+
+  if (push.exitCode !== 0) {
+    return {
+      result: "FAIL" as const,
+      detail: `schedule or push: ${push.output.split("\n").at(-1)}`,
+    };
+  }
+
+  const id = await jobFor(agent, name);
+
+  if (!id) {
+    return { result: "FAIL" as const, detail: "push reported success but no job was saved" };
+  }
+
+  const started = Date.now();
+  await cli(["run", id, "--home", state], RUN_TIMEOUT_MS);
+  const seconds = Math.round((Date.now() - started) / 1000);
+  const last = await readFile(join(state, "jobs", id, "last.json"), "utf8")
+    .then((text) => JSON.parse(text) as { outcome: string; log: string })
+    .catch(() => undefined);
+  const log = last ? await readFile(last.log, "utf8").catch(() => "") : "";
+  return log.includes(token)
+    ? {
+        result: "PASS" as const,
+        detail: `${seconds}s, read ${scope === "skill" ? "the committed" : "the global"} skill's marker.md at read access`,
+      }
+    : {
+        result: "FAIL" as const,
+        detail: `no reply with the token from marker.md (outcome ${last?.outcome ?? "unknown"})\n${log
+          .trim()
+          .split("\n")
+          .slice(-12)
+          .map((line) => `      | ${line}`)
+          .join("\n")}`,
+      };
+}
+
+for (const agent of agents) {
+  const model = process.env[`AS_MODEL_${agent.replaceAll("-", "_").toUpperCase()}`];
+
+  if (!rows.some((row) => row.agent === agent && row.result === "SKIP")) {
+    for (const scope of ["skill", "global"] as const) {
+      rows.push({ agent, variant: scope, ...(await skillRun(agent, scope, model)) });
+    }
   }
 }
 

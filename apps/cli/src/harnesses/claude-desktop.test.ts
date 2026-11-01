@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { claudeDesktop } from "./claude-desktop.ts";
 import { connect, run } from "../harness.ts";
 
@@ -38,7 +39,7 @@ test.skipIf(process.platform !== "linux")(
 
     const adapter = await connect(claudeDesktop, { cwd });
     expect(await run(adapter.check(schedule, false))).toBeUndefined();
-    expect(await run(adapter.save(schedule))).toStartWith(
+    expect((await run(adapter.save(schedule))).note).toStartWith(
       "Manual permissions, so a run stops for each tool you haven't allowed: click Run now",
     );
 
@@ -64,24 +65,28 @@ test.skipIf(process.platform !== "linux")(
     const reopened = await connect(claudeDesktop, { cwd });
     expect(await run(reopened.list)).toEqual([
       {
+        id: "dependency-watch",
         name: "Dependency watch",
         status: "paused",
+        workspace: cwd,
         lastRun: { at: new Date(Date.UTC(2026, 9, 26, 8, 3)) },
+        settings: { permissionMode: "acceptEdits" },
         schedule,
       },
     ]);
     // An existing task keeps whatever mode it was given in the app.
     expect(
       await run(reopened.save({ ...schedule, prompt: "Report the updated findings." })),
-    ).toBeUndefined();
+    ).toEqual({ id: "dependency-watch" });
     expect(await readFile(skillPath, "utf8")).toBe(
       `${customFrontmatter}---\n\nReport the updated findings.\n`,
     );
     const updated = JSON.parse(await readFile(manifestPath, "utf8"));
     expect(updated.scheduledTasks[0].permissionMode).toBe("acceptEdits");
-    expect(await run(reopened.save({ ...schedule, name: "Nightly" }))).toBe(
-      "Bypass permissions, so runs can do anything",
-    );
+    expect(await run(reopened.save({ ...schedule, name: "Nightly" }))).toEqual({
+      id: "nightly",
+      note: "Bypass permissions, so runs can do anything",
+    });
   },
 );
 
@@ -119,3 +124,59 @@ printf '%s\\n' '"Claude.exe","1234","Console","1","42,000 K"'
     process.env.PATH = path;
   }
 });
+
+test.skipIf(process.platform !== "linux")(
+  "lists every workspace's tasks and pauses, updates and removes them by id",
+  async () => {
+    const manifestPath = join(root, "app/claude-code-sessions/account/org/scheduled-tasks.json");
+    const tasksDir = join(root, "config/scheduled-tasks");
+    const task = (id: string, cwd: string) => ({
+      id,
+      displayName: id,
+      cronExpression: "0 8 1 * *",
+      enabled: true,
+      filePath: join(tasksDir, id, "SKILL.md"),
+      createdAt: 1,
+      cwd,
+    });
+    for (const id of ["mine", "theirs"]) {
+      await mkdir(join(tasksDir, id), { recursive: true });
+      await writeFile(join(tasksDir, id, "SKILL.md"), `---\nname: ${id}\n---\n\nRun ${id}.\n`);
+    }
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        scheduledTasks: [task("mine", join(root, "repo")), task("theirs", "/other")],
+      }),
+    );
+
+    const all = await run(claudeDesktop.inventory);
+    expect(all.map((live) => [live.id, live.workspace, "schedule" in live])).toEqual([
+      ["mine", join(root, "repo"), true],
+      ["theirs", "/other", true],
+    ]);
+
+    await run(claudeDesktop.setEnabled?.("theirs", false) ?? Effect.succeed(undefined));
+    const adapter = await connect(claudeDesktop, { cwd: join(root, "repo") });
+    expect(
+      await run(
+        adapter.save(
+          { name: "Renamed", timing: { minute: 0, hour: 9, weekdays: null }, prompt: "Run it." },
+          "mine",
+        ),
+      ),
+    ).toEqual({ id: "mine" });
+    await run(claudeDesktop.remove?.("theirs") ?? Effect.succeed(undefined));
+
+    const { scheduledTasks } = JSON.parse(await readFile(manifestPath, "utf8"));
+    expect(scheduledTasks).toMatchObject([
+      { id: "mine", displayName: "Renamed", cronExpression: "0 9 * * *", enabled: true },
+    ]);
+    expect(await readFile(join(tasksDir, "theirs", "SKILL.md"), "utf8").catch(() => "gone")).toBe(
+      "gone",
+    );
+    // The other tests here start from an account with no tasks, in whatever order they run.
+    await rm(manifestPath);
+    await rm(tasksDir, { recursive: true });
+  },
+);

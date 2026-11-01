@@ -19,6 +19,8 @@ export interface Agent {
   /** Agents that fall back to an unexpected model without one. */
   readonly requiresModel: boolean;
   readonly invoke: (prompt: string, access: Access, model: string | undefined) => Invocation;
+  /** Access levels at which runs can't read files outside the repository, such as global skills. */
+  readonly confined?: ReadonlyArray<Access>;
   /** What an access level leaves to the agent's own settings, shown when pushing. */
   readonly limits?: Partial<Record<Access, string>>;
   /** Some agents exit 0 after a failed run; this reads their output for the real result. */
