@@ -16,6 +16,10 @@
     "dist"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "dev": "bun src/cli.ts",
     "build": "bun build src/cli.ts --target node --outfile dist/cli.js",

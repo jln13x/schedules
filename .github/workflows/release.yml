@@ -1,6 +1,8 @@
 # With pending changesets, opens or updates the "Version Packages" PR. Merging that PR publishes the
-# new version to npm through trusted publishing, so no npm token is stored anywhere. Only the publish
-# job may request the OIDC token npm accepts. Actions are pinned to commits so that what runs with
+# new version to npm through trusted publishing, so no npm token is stored anywhere, and npm attests
+# its provenance: which commit and workflow built it. apps/cli's publishConfig requires that
+# attestation, so a publish that can't produce one fails. Only the publish job may request the OIDC
+# token npm accepts. Actions are pinned to commits so that what runs with
 # publish permissions only changes through a reviewed edit here.
 name: Release
 
