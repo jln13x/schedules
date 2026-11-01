@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { DitherButton } from "@/components/dithercn/dither-button";
+
+// Next marks it noindex itself.
+export const metadata: Metadata = { title: "Page not found" };
 
 export default function NotFound() {
   return (
