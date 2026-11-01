@@ -14,8 +14,7 @@ Schedules are recurring prompts for your coding agent, kept as Markdown files in
 ## Schedule a skill
 
 ```sh
-npx skills add <owner/repo> --skill <skill>
-npx agent-schedules schedule <skill> "0 7 * * 1"
+npx agent-schedules add <owner/repo/skill>
 npx agent-schedules push <harness>
 ```
 

@@ -4,6 +4,7 @@
  * keep in sync by hand; whether their values are still accepted is what the marker runs show.
  * Costs nothing: no model is called. Exit 1 when an installed agent is missing a flag.
  */
+import { SKILLS_CLI, installArgs } from "../src/add.ts";
 import { AGENTS, COMMAND_LINE_AGENTS } from "../src/harnesses/agents.ts";
 import { ACCESS } from "../src/harnesses/cron/agent.ts";
 import { versionNumber } from "../src/harnesses/verified.ts";
@@ -95,5 +96,25 @@ for (const agent of agents) {
 
   const note = unlisted.length > 0 ? `; values not shown in help: ${unlisted.join(", ")}` : "";
   console.log(`${agent.padEnd(13)} ok        ${version}: ${[...flags].join(" ")}${note}`);
+}
+
+// `add` installs through the skills CLI at a pinned version; its flags come from the real arguments.
+if (only.length === 0 || only.includes("skills")) {
+  const source = { owner: "probe", repo: "probe", skill: "probe" };
+  const flags = new Set(
+    [true, false].flatMap((global) =>
+      installArgs(source, { global, interactive: false })
+        .slice(2)
+        .filter((arg) => arg.startsWith("-")),
+    ),
+  );
+  const help = await capture(["npx", "-y", SKILLS_CLI, "add", "--help"]);
+  const missing = [...flags].filter((flag) => !flagShown(help, flag));
+  failed ||= missing.length > 0;
+  console.log(
+    missing.length > 0
+      ? `${"skills".padEnd(13)} FAIL      ${SKILLS_CLI}: add --help lacks ${missing.join(", ")}`
+      : `${"skills".padEnd(13)} ok        ${SKILLS_CLI}: ${[...flags].join(" ")}`,
+  );
 }
 process.exit(failed ? 1 : 0);

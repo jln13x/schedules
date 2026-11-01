@@ -45,16 +45,14 @@ export const DOC_PAGES: Record<
         </p>
         <H2>Schedule a skill</H2>
         <pre>
-          <code>{`npx skills add <owner/repo> --skill <skill>
-npx agent-schedules schedule <skill> "0 7 * * 1"
+          <code>{`npx agent-schedules add <owner/repo/skill>
 npx agent-schedules push <harness>`}</code>
         </pre>
         <p>
-          <code>npx skills add</code> installs the skill from{" "}
-          <a href="https://skills.sh">skills.sh</a>. <code>schedule</code> writes a schedule that
-          runs it, and <code>push</code> registers that with one of the{" "}
-          <a href="/docs/harnesses">harnesses</a>. Read the skill before you schedule it: runs
-          happen with nobody watching.
+          <code>add</code> installs the skill from <a href="https://skills.sh">skills.sh</a> and
+          writes a schedule that runs it at the time schedules.sh suggests. <code>push</code>{" "}
+          registers that with one of the <a href="/docs/harnesses">harnesses</a>. Read the skill
+          before you schedule it: runs happen with nobody watching.
         </p>
         <H2>Write your own</H2>
         <p>
@@ -92,19 +90,21 @@ npx agent-schedules push <harness>`}</code>
 find skills worth scheduling on schedules.sh, best first
 
 Arguments:
-  query       words to match against names and descriptions
+  query         words to match against names and descriptions
 
 Options:
-  -h, --help  display help for command`}</code>
+  --ssh <host>  run on this ssh host, which is remembered for list --all
+  --cwd <dir>   run as if started in this folder
+  -h, --help    display help for command`}</code>
         </pre>
         <hr />
         <H2>schedule</H2>
         <p>
-          Use the <code>schedule</code> command to run an installed skill on a schedule. It finds
-          the skill where <code>npx skills add</code> put it, in the repository or in your home
-          folder, and writes a schedule whose prompt tells the agent to read the skill&apos;s{" "}
-          <code>SKILL.md</code> and the files beside it. A name installed more than once, or not at
-          all, is refused; pass the skill&apos;s folder to pick one.
+          Use the <code>schedule</code> command to run a skill you already installed on a schedule,
+          at a time you choose. It finds the skill where <code>npx skills add</code> put it, in the
+          repository or in your home folder, and writes a schedule whose prompt tells the agent to
+          read the skill&apos;s <code>SKILL.md</code> and the files beside it. A name installed more
+          than once, or not at all, is refused; pass the skill&apos;s folder to pick one.
         </p>
         <p>
           Run it again with another cron to change the time; a prompt you edited is kept. A skill
@@ -136,36 +136,46 @@ Options:
   -n, --name <name>  name the schedule, to run one skill at several times
   -g, --global       use ~/.agents/schedules even inside a repository
   --dry-run          preview changes without writing anything
+  --ssh <host>       run on this ssh host, which is remembered for list --all
+  --cwd <dir>        run as if started in this folder
   -h, --help         display help for command`}</code>
         </pre>
         <hr />
-        <H2>add (deprecated)</H2>
+        <H2>add</H2>
         <p>
-          <code>add</code> copies schedules from a public GitHub repository into
-          <code> .agents/schedules/</code>. schedules.sh lists skills now, so use{" "}
-          <code>schedule</code> instead; <code>add</code> keeps working for repositories that still
-          publish schedule files. Pass <code>owner/repo</code> for all of its schedules or
-          <code> owner/repo/name</code> for one, and review the prompt before pushing.
+          Use the <code>add</code> command to install a skill from{" "}
+          <a href="https://skills.sh">skills.sh</a> and schedule it in one step, at the time
+          schedules.sh suggests for it. It installs with skills.sh&apos;s own CLI, which asks which
+          agents to install for when you run it in a terminal, and counts the install there. A skill
+          that is already installed is only scheduled. Pass <code>--cron</code> for another time,
+          which a skill schedules.sh doesn&apos;t list needs, and <code>--push</code> to register it
+          with a harness right away.
         </p>
         <pre>
-          <code>{`npx agent-schedules add <owner/repo/name>`}</code>
+          <code>{`npx agent-schedules add mattpocock/skills/triage --push claude-code`}</code>
         </pre>
         <p>
           <strong>Options</strong>
         </p>
         <pre>
-          <code>{`Usage: agent-schedules add [options] <source>
+          <code>{`Usage: agent-schedules add [options] <skill>
 
-(deprecated) copy schedules from a public GitHub repository into
-.agents/schedules
+install a skill from skills.sh and schedule it at the time schedules.sh suggests
 
 Arguments:
-  source        owner/repo for all of its schedules, or owner/repo/name for one
+  skill              owner/repo/skill, as on schedules.sh
 
 Options:
-  -g, --global  use ~/.agents/schedules even inside a repository
-  --dry-run     preview changes without writing anything
-  -h, --help    display help for command`}</code>
+  --cron <cron>      run it at this time instead, such as '0 8 * * 1-5'
+  -n, --name <name>  name the schedule, to run one skill at several times
+  --push <harness>   push the schedule to this harness right away (choices:
+                     "t3", "codex-desktop", "claude-desktop", "codex",
+                     "claude-code", "pi", "opencode", "cursor-agent")
+  -g, --global       use ~/.agents/schedules even inside a repository
+  --dry-run          preview changes without writing anything
+  --ssh <host>       run on this ssh host, which is remembered for list --all
+  --cwd <dir>        run as if started in this folder
+  -h, --help         display help for command`}</code>
         </pre>
         <hr />
         <H2>pull</H2>
@@ -465,10 +475,6 @@ Options:
         <H2>Environment</H2>
         <ul>
           <li>
-            <code>GITHUB_TOKEN</code> or <code>GH_TOKEN</code>: used by <code>add</code> for GitHub
-            API lookups, which raises its rate limit.
-          </li>
-          <li>
             <code>AGENT_SCHEDULES_HOME</code>: where this CLI keeps its state on each machine: which
             task each file was pushed to, the hosts <code>--ssh</code> has used, and the
             command-line agents&apos; tasks, prompts and logs.
@@ -479,9 +485,11 @@ Options:
         </ul>
         <H2>Telemetry</H2>
         <p>
-          The CLI sends nothing about you. Versions before 0.3 reported each <code>add</code> from a
-          public repository to schedules.sh; that endpoint is gone, and <code>DO_NOT_TRACK=1</code>{" "}
-          still turns the report off in those versions.
+          The CLI sends nothing about you to schedules.sh. <code>add</code> installs through
+          skills.sh&apos;s CLI, which counts the install on skills.sh as <code>npx skills add</code>{" "}
+          does. Versions before 0.3 reported each <code>add</code> from a public repository to
+          schedules.sh; that endpoint is gone, and <code>DO_NOT_TRACK=1</code> still turns the
+          report off in those versions.
         </p>
       </>
     ),
@@ -539,9 +547,9 @@ Use the triage skill: read .agents/skills/triage/SKILL.md and follow it. ...`}</
           <code>*</code> for weekdays: <code>0 8 1 * *</code> runs at 08:00 on the 1st. T3 Code
           can&apos;t run monthly schedules; the other harnesses can. These three fields are the
           whole frontmatter; anything else is an error, and versions before 0.3 reject{" "}
-          <code>skill</code>. <code>pull</code> and <code>add</code> write files in exactly this
-          form, so keep your formatter away from <code>.agents/schedules/</code> and they will read
-          as unchanged.
+          <code>skill</code>. <code>pull</code>, <code>schedule</code> and <code>add</code> write
+          files in exactly this form, so keep your formatter away from{" "}
+          <code>.agents/schedules/</code> and they will read as unchanged.
         </p>
       </>
     ),

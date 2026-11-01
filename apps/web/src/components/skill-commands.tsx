@@ -24,11 +24,9 @@ function subscribe(onChange: () => void) {
 
 export function SkillCommands({
   skill,
-  cron,
   monthly,
 }: {
   skill: { owner: string; repo: string; slug: string };
-  cron: string;
   monthly: boolean;
 }) {
   const saved = useSyncExternalStore(
@@ -61,22 +59,17 @@ export function SkillCommands({
       </div>
       <ol className="grid gap-4">
         <li className="grid gap-2">
-          <p className="text-muted-foreground text-xs">1. Install the skill from skills.sh</p>
+          <p className="text-muted-foreground text-xs">
+            1. Install it from skills.sh and schedule it in your repository
+          </p>
           <CopyCommand
-            key={`install-${runner}`}
-            command={`${command} skills add ${skill.owner}/${skill.repo} --skill ${skill.slug}`}
-          />
-        </li>
-        <li className="grid gap-2">
-          <p className="text-muted-foreground text-xs">2. Schedule it in your repository</p>
-          <CopyCommand
-            key={`schedule-${runner}`}
-            command={`${command} agent-schedules schedule ${skill.slug} "${cron}"`}
+            key={`add-${runner}`}
+            command={`${command} agent-schedules add ${skill.owner}/${skill.repo}/${skill.slug}`}
           />
         </li>
         <li className="grid gap-2">
           <p className="text-muted-foreground text-xs">
-            3. Push it to the agent that runs it, such as <code>t3</code> or{" "}
+            2. Push it to the agent that runs it, such as <code>t3</code> or{" "}
             <code>claude-code</code> (
             <a href="/docs/harnesses" className="underline decoration-dotted underline-offset-4">
               all harnesses
