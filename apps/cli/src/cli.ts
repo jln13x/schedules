@@ -8,13 +8,7 @@ import { Argument, Command, Option } from "commander";
 import { Effect } from "effect";
 import { description, version } from "../package.json";
 import { type LiveSchedule, Workspace, connect as connectHarness, run } from "./harness.ts";
-import {
-  fetchSchedules,
-  formatSearchResults,
-  parseSource,
-  reportInstall,
-  searchSchedules,
-} from "./registry.ts";
+import { fetchSchedules, formatSearchResults, parseSource, searchSkills } from "./registry.ts";
 import {
   SCHEDULES_DIR,
   type Schedule,
@@ -24,8 +18,10 @@ import {
   sameSchedule,
   schedulePath,
   slug,
+  timingFromCron,
   writeSchedule,
 } from "./schedule.ts";
+import { isCommitted, resolveSkill, skillPrompt } from "./skills.ts";
 import {
   ACCESS,
   type Access,
@@ -76,6 +72,7 @@ async function location(global: boolean) {
   return {
     cwd: checkout === null ? homedir() : (main ?? checkout),
     dir: join(checkout ?? homedir(), SCHEDULES_DIR),
+    checkout,
   };
 }
 
@@ -113,19 +110,87 @@ function createReport() {
 }
 
 async function search(words: ReadonlyArray<string>) {
-  const results = await searchSchedules(words.join(" "));
+  const results = await searchSkills(words.join(" "));
   console.log(
     results.length === 0
-      ? "No schedules match."
-      : `${formatSearchResults(results)}\n\nInstall one with: agent-schedules add <owner/repo/name>`,
+      ? "No skills match."
+      : `${formatSearchResults(results)}\n\nInstall one, then schedule it:\n  npx skills add <owner/repo> --skill <skill>\n  agent-schedules schedule <skill> "<cron>"`,
   );
 }
 
+async function schedule(
+  query: string,
+  cron: string,
+  { global, dryRun, name: requested }: Options & { readonly name?: string },
+) {
+  const timing = timingFromCron(cron);
+
+  if (typeof timing === "string") {
+    throw new Error(timing);
+  }
+
+  const { dir, checkout } = await location(global);
+  const skill = await resolveSkill(query, global ? null : checkout);
+  const files = await readSchedules(dir);
+  const name = requested?.trim() || skill.name;
+  // Without a name, scheduling a skill again changes the file that already runs it.
+  const file = requested
+    ? files.find((candidate) => candidate.schedule.name === name)
+    : (files.find((candidate) => candidate.schedule.skill === skill.name) ??
+      files.find((candidate) => candidate.schedule.name === name));
+
+  if (file && file.schedule.skill !== skill.name) {
+    throw new Error(
+      `${display(file.path)} already holds "${file.schedule.name}"; pass --name to schedule ${skill.name} under another name`,
+    );
+  }
+
+  const prompt = skillPrompt(skill);
+  // A prompt someone edited is theirs; only the timing follows this command.
+  const edited = file !== undefined && file.schedule.prompt !== prompt;
+  const next: Schedule = {
+    name: file?.schedule.name ?? name,
+    timing,
+    prompt: edited ? file.schedule.prompt : prompt,
+    skill: skill.name,
+  };
+
+  if (file && sameSchedule(file.schedule, next)) {
+    line("unchanged", next.name, display(file.path));
+    return;
+  }
+
+  const path = file?.path ?? schedulePath(dir, files, next.name);
+
+  if (!dryRun) {
+    await writeSchedule(path, next);
+  }
+
+  line(
+    file ? "update" : "create",
+    next.name,
+    `${display(path)}, ${describeTiming(timing)}${edited ? ", kept its edited prompt" : ""}`,
+  );
+
+  if (skill.scope === "project" && checkout !== null && !(await isCommitted(skill, checkout))) {
+    console.log(
+      `note      ${skill.path} isn't committed, so tasks that run in a worktree or another clone won't find it`,
+    );
+  }
+
+  if (!dryRun) {
+    console.log("Run agent-schedules push <harness> to register it.");
+  }
+}
+
 async function add(value: string, { global, dryRun }: Options) {
+  console.error(
+    "note      add is deprecated: schedules.sh lists skills now. Install one with npx skills add, then run agent-schedules schedule <skill> <cron>",
+  );
   const { dir } = await location(global);
   const files = await readSchedules(dir);
   const report = createReport();
-  const { schedules, isPublic, source } = await fetchSchedules(parseSource(value));
+  const { schedules } = await fetchSchedules(parseSource(value));
   const written: Array<ScheduleFile> = [...files];
   for (const schedule of schedules) {
     const file = files.find((candidate) => candidate.schedule.name === schedule.name);
@@ -140,10 +205,6 @@ async function add(value: string, { global, dryRun }: Options) {
 
       if (!dryRun) {
         await writeSchedule(path, schedule);
-
-        if (isPublic) {
-          await reportInstall(source, schedule.name);
-        }
       }
 
       written.push({ path, schedule });
@@ -289,7 +350,12 @@ async function sync(
             return { name: task.name, action: "unchanged" };
           }
 
-          return { name: task.name, action: file ? "update" : "create", schedule: task.schedule };
+          return {
+            name: task.name,
+            action: file ? "update" : "create",
+            // The harness doesn't know which skill the prompt runs; the file still does.
+            schedule: { ...task.schedule, skill: file?.schedule.skill },
+          };
         })
       : files.map(({ schedule }): Plan => {
           const task = live.find((candidate) => candidate.name === schedule.name);
@@ -530,13 +596,23 @@ const program = new Command("agent-schedules")
 
 program
   .command("search")
-  .description("find schedules on schedules.sh, most installed first")
-  .argument("[query...]", "words to match against names and prompts")
+  .description("find skills worth scheduling on schedules.sh, best first")
+  .argument("[query...]", "words to match against names and descriptions")
   .action(search);
 
 program
+  .command("schedule")
+  .description(`run an installed skill on a schedule: writes its file in ${SCHEDULES_DIR}`)
+  .argument("<skill>", "the skill's name, owner/repo/skill, or the path to its folder")
+  .argument("<cron>", "when it runs, such as '0 8 * * 1-5' or '0 8 1 * *'")
+  .option("-n, --name <name>", "name the schedule, to run one skill at several times")
+  .option(...GLOBAL)
+  .option(...DRY_RUN)
+  .action(schedule);
+
+program
   .command("add")
-  .description(`copy schedules from a public GitHub repository into ${SCHEDULES_DIR}`)
+  .description(`(deprecated) copy schedules from a public GitHub repository into ${SCHEDULES_DIR}`)
   .argument("<source>", "owner/repo for all of its schedules, or owner/repo/name for one")
   .option(...GLOBAL)
   .option(...DRY_RUN)

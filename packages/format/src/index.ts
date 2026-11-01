@@ -24,6 +24,8 @@ export interface Schedule {
   readonly name: string;
   readonly timing: Timing;
   readonly prompt: string;
+  /** The installed skill the prompt runs, which schedule updates find the file by. */
+  readonly skill?: string | undefined;
 }
 
 export function wholeNumber(
@@ -131,7 +133,11 @@ export function timingFromCron(cron: string): Timing | string {
 }
 
 const decodeFrontmatter = Schema.decodeUnknownResult(
-  Schema.Struct({ name: Schema.String, schedule: Schema.String }),
+  Schema.Struct({
+    name: Schema.String,
+    schedule: Schema.String,
+    skill: Schema.optionalKey(Schema.String),
+  }),
   { onExcessProperty: "error" },
 );
 
@@ -239,14 +245,32 @@ export function parseSchedule(raw: string, source: string): Schedule {
     throw new Error(`${source}: the prompt body is empty`);
   }
 
-  return { name, timing, prompt };
+  const skill = parsed.success.skill?.trim();
+
+  if (skill === undefined) {
+    return { name, timing, prompt };
+  }
+
+  if (!skill || /\p{Cc}/u.test(skill)) {
+    throw new Error(`${source}: skill must be a skill's name on one line`);
+  }
+
+  return { name, timing, prompt, skill };
 }
 
-export function serializeSchedule({ name, timing, prompt }: Schedule): string {
-  const frontmatter = stringifyYaml({ name, schedule: formatCron(timing) }).trimEnd();
+export function serializeSchedule({ name, timing, prompt, skill }: Schedule): string {
+  const frontmatter = stringifyYaml({
+    name,
+    schedule: formatCron(timing),
+    ...(skill === undefined ? {} : { skill }),
+  }).trimEnd();
   return `---\n${frontmatter}\n---\n\n${prompt.trim()}\n`;
 }
 
+/** Whether two schedules run the same; harnesses don't keep which skill a prompt came from. */
 export function sameSchedule(left: Schedule, right: Schedule): boolean {
-  return serializeSchedule(left) === serializeSchedule(right);
+  return (
+    serializeSchedule({ ...left, skill: undefined }) ===
+    serializeSchedule({ ...right, skill: undefined })
+  );
 }

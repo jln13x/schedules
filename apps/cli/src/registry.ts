@@ -3,7 +3,6 @@ import { type Schedule, parseSchedule, slug } from "./schedule.ts";
 
 const SITE_URL = process.env.AGENT_SCHEDULES_URL ?? "https://schedules.sh";
 const GITHUB_API = process.env.GITHUB_API_URL ?? "https://api.github.com";
-const TELEMETRY_TIMEOUT_MS = 3_000;
 const DOWNLOAD_TIMEOUT_MS = 20_000;
 const MAX_SCHEDULE_BYTES = 100_000;
 const MAX_API_BYTES = 1_000_000;
@@ -93,7 +92,6 @@ export function parseSource(value: string): Source {
 }
 
 const repoSchema = Schema.Struct({
-  private: Schema.Boolean,
   default_branch: Schema.String,
   owner: Schema.Struct({ login: Schema.String }),
   name: Schema.String,
@@ -134,9 +132,6 @@ async function github<T>(path: string, schema: Schema.Decoder<T>): Promise<T> {
 
 export interface Fetched {
   readonly schedules: ReadonlyArray<Schedule>;
-  readonly isPublic: boolean;
-  /** The source under the repository's current name, which a rename on GitHub may have changed. */
-  readonly source: Source;
 }
 
 export async function fetchSchedules(requested: Source): Promise<Fetched> {
@@ -189,11 +184,7 @@ export async function fetchSchedules(requested: Source): Promise<Fetched> {
         `${owner}/${repo}/${entry.name}`,
       );
     });
-    return {
-      schedules,
-      isPublic: !repository.private,
-      source: { owner, repo, ...(name ? { name } : {}) },
-    };
+    return { schedules };
   } catch (error) {
     throw displayError(error);
   }
@@ -206,12 +197,14 @@ const searchResultSchema = Schema.Struct({
   name: Schema.String,
   displayName: Schema.String,
   installs: Schema.Number,
+  schedule: Schema.Struct({ cron: Schema.String, label: Schema.String }),
 });
+// The site has listed skills under this key since it listed repository schedules.
 const searchSchema = Schema.Struct({ schedules: Schema.Array(searchResultSchema) });
 
 export type SearchResult = typeof searchResultSchema.Type;
 
-export async function searchSchedules(query: string): Promise<ReadonlyArray<SearchResult>> {
+export async function searchSkills(query: string): Promise<ReadonlyArray<SearchResult>> {
   try {
     const response = await fetch(`${SITE_URL}/api/search?${new URLSearchParams({ q: query })}`, {
       signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
@@ -229,27 +222,19 @@ export async function searchSchedules(query: string): Promise<ReadonlyArray<Sear
   }
 }
 
+/** One line per skill: where it comes from, its installs, and the schedule the site suggests. */
 export function formatSearchResults(results: ReadonlyArray<SearchResult>): string {
-  const sources = results.map(({ owner, repo, name }) => display(`${owner}/${repo}/${name}`));
-  const sourceWidth = Math.max(...sources.map((source) => source.length));
-  const installWidth = Math.max(...results.map(({ installs }) => String(installs).length));
-  return results
-    .map(
-      (result, index) =>
-        `${(sources[index] ?? "").padEnd(sourceWidth)}  ${String(result.installs).padStart(installWidth)} installs  ${display(result.displayName)}`,
+  const columns = results.map((result) => [
+    display(`${result.owner}/${result.repo}/${result.name}`),
+    `${result.installs} installs`,
+    display(`${result.schedule.label}  ${result.schedule.cron}`),
+  ]);
+  const widths = [0, 1].map((column) =>
+    Math.max(...columns.map((row) => row[column]?.length ?? 0)),
+  );
+  return columns
+    .map(([source = "", installs = "", schedule = ""]) =>
+      [source.padEnd(widths[0] ?? 0), installs.padStart(widths[1] ?? 0), schedule].join("  "),
     )
     .join("\n");
-}
-
-export async function reportInstall(source: Source, name: string): Promise<void> {
-  if (process.env.DO_NOT_TRACK) {
-    return;
-  }
-
-  await fetch(`${SITE_URL}/api/installs`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ owner: source.owner, repo: source.repo, name: slug(name) }),
-    signal: AbortSignal.timeout(TELEMETRY_TIMEOUT_MS),
-  }).catch(() => undefined);
 }
