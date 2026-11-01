@@ -110,6 +110,12 @@ async function schedule(
     `${display(path)}, ${describeTiming(timing)}${edited ? ", kept its edited prompt" : ""}`,
   );
 
+  if (skill.scope === "global") {
+    console.log(
+      `note      ${skill.path} is outside the repository: Claude Code and OpenCode can only read it with --access full`,
+    );
+  }
+
   if (skill.scope === "project" && checkout !== null && !(await isCommitted(skill, checkout))) {
     console.log(
       `note      ${skill.path} isn't committed, so tasks that run in a worktree or another clone won't find it`,

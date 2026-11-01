@@ -116,6 +116,13 @@ export const runCommand = (id: string) =>
 
     const fs = yield* FileSystem.FileSystem;
     const copy = join(runnerHome(), "agent-schedules.mjs");
+
+    // Already running from the copy, as a remote host's CLI may be; copying it onto itself would
+    // delete it first.
+    if (script === resolve(copy)) {
+      return [process.execPath, copy, ...args];
+    }
+
     yield* makeDirectory(runnerHome(), 0o700);
     // Replaced rather than overwritten, so a link planted at that name can't redirect the copy.
     yield* removePath(copy);

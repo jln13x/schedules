@@ -270,13 +270,28 @@ async function remoteInventory(harness: HarnessName | undefined): Promise<Invent
           ["list", "--all", "--json", "--local-only", ...(harness ? [harness] : [])],
           { capture: true },
         );
-        // A list that ran prints its JSON even when some of it failed; otherwise ssh or the
-        // remote shell says why on stderr.
+        // A list that ran prints its JSON even when some of it failed; otherwise ssh, the remote
+        // shell or the CLI there says why on stderr, the CLI on a line of its own.
+        const reason = () => {
+          const lines = stderr.trim().split("\n");
+          return (
+            lines.find((line) => line.startsWith("error:")) ?? lines.at(-1) ?? `exit code ${code}`
+          );
+        };
+
         if (code !== 0 && !stdout.trim()) {
-          throw new Error(stderr.trim().split("\n").at(-1) || `exit code ${code}`);
+          throw new Error(reason());
         }
 
-        const remote = decodeInventory(stdout);
+        const remote = (() => {
+          try {
+            return decodeInventory(stdout);
+          } catch {
+            throw new Error(
+              code === 0 ? `${host} answered with something other than a list` : reason(),
+            );
+          }
+        })();
 
         return {
           version: 1,

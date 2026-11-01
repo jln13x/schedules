@@ -111,6 +111,11 @@ Options:
           that isn&apos;t committed is flagged, since tasks that run in a worktree or another clone
           won&apos;t find it. Then <code>push</code> the schedule.
         </p>
+        <p>
+          Install skills into the repository rather than with <code>-g</code> where you can. Claude
+          Code and OpenCode can&apos;t read files outside the repository below{" "}
+          <code>--access full</code>, so a push of a global skill to them is refused.
+        </p>
         <pre>
           <code>{`npx agent-schedules schedule triage "0 8 * * 1-5"`}</code>
         </pre>
@@ -672,7 +677,8 @@ Use the triage skill: read .agents/skills/triage/SKILL.md and follow it. ...`}</
               <td>
                 At <code>read</code> and <code>edit</code>, commands are denied unless your
                 user-level Claude Code settings allow them; the repository&apos;s settings, hooks
-                and MCP servers aren&apos;t loaded.
+                and MCP servers aren&apos;t loaded. Files outside the repository, such as global
+                skills, can&apos;t be read.
               </td>
             </tr>
             <tr>

@@ -32,6 +32,7 @@ import {
   runnerHome,
 } from "./jobs.ts";
 import { cronJobIds, cronMissing, installCronJob, removeCronJob, runCommand } from "./crontab.ts";
+import { skillOutsideRepository } from "../../skills.ts";
 import { verifiedLine } from "../verified.ts";
 
 export { ACCESS, type Access } from "./agent.ts";
@@ -170,6 +171,13 @@ function makeHarness(agent: CommandLineAgent) {
       }
 
       const existing = (yield* mine).find((job) => job.name === schedule.name);
+      const level = access ?? existing?.access ?? "read";
+      const outside = skillOutsideRepository(schedule);
+
+      if (outside && spec.confined?.includes(level)) {
+        return `${spec.label} can't read files outside the repository at ${level} access, so its runs couldn't open ${outside}. Install the skill into the repository (npx skills add without -g), or push with --access full`;
+      }
+
       return spec.requiresModel && !requested && !existing?.model
         ? `${spec.label} needs --model provider/model, or it falls back to a free hosted model`
         : undefined;

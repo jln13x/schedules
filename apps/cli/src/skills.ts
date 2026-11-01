@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
-import { slug } from "./schedule.ts";
+import { type Schedule, slug } from "./schedule.ts";
 
 /**
  * Where `npx skills add` puts skills that the agents this CLI schedules read: the canonical
@@ -202,6 +202,15 @@ export function skillPrompt(skill: InstalledSkill): string {
     `Use the ${skill.name} skill: read ${skill.path}/SKILL.md and follow it. The files it refers to are in ${skill.path}/.`,
     "This run was started on a schedule and nobody is watching it, so don't wait for answers: make reasonable choices and say what you did.",
   ].join("\n\n");
+}
+
+/**
+ * The folder of a skill a schedule runs when it lies outside the repository, read from the prompt
+ * `schedule` wrote. Project skills are written as relative paths, everything else isn't.
+ */
+export function skillOutsideRepository(schedule: Schedule): string | undefined {
+  const folder = schedule.skill && /read (\S+)\/SKILL\.md/.exec(schedule.prompt)?.[1];
+  return folder && (folder.startsWith("~") || isAbsolute(folder)) ? folder : undefined;
 }
 
 /** Whether git tracks the skill, so worktrees and other clones of the repository have it too. */
