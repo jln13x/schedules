@@ -6,7 +6,15 @@ import { JsonLd } from "@/components/json-ld";
 import { REPOSITORY_SEGMENT, SCHEDULE_SLUG } from "@/db/format";
 import { SkillCommands } from "@/components/skill-commands";
 import { SuggestedSchedule } from "@/components/suggested-schedule";
-import { compactNumber, githubUrl, pageMetadata, SITE, skillPath, skillsShUrl } from "@/lib/site";
+import {
+  compactNumber,
+  githubUrl,
+  pageMetadata,
+  SITE,
+  skillPath,
+  skillsShUrl,
+  snippet,
+} from "@/lib/site";
 import { cachedSkill } from "@/server/cached";
 
 // No loading shell: the skill comes from the cache, so there is nothing worth streaming a
@@ -28,7 +36,11 @@ export async function generateMetadata({ params }: SkillPageProps) {
   return pageMetadata({
     title: `Run ${skill.name} on a schedule`,
     path: skillPath(skill),
-    description: skill.description.slice(0, 160),
+    description: snippet(
+      skill.description ||
+        `Run ${skill.name} from ${skill.owner}/${skill.repo} on a schedule with your coding agent: ${skill.schedule.label.toLowerCase()}.`,
+    ),
+    ownImage: true,
   });
 }
 
@@ -47,16 +59,11 @@ export default async function SkillPage({ params }: SkillPageProps) {
           "@context": "https://schema.org",
           "@type": "BreadcrumbList",
           itemListElement: [
+            // Steps on this site only: the repository has no page here.
             { "@type": "ListItem", position: 1, name: "Skills", item: SITE.origin },
             {
               "@type": "ListItem",
               position: 2,
-              name: `${owner}/${repo}`,
-              item: githubUrl(skill),
-            },
-            {
-              "@type": "ListItem",
-              position: 3,
               name: skill.name,
               item: `${SITE.origin}${skillPath(skill)}`,
             },

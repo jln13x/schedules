@@ -22,6 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: DOC_PAGES[slug].title,
     path: `/docs/${slug}`,
     description: DOC_PAGES[slug].description,
+    ownImage: true,
   });
 }
 export default async function DocumentationPage({ params }: { params: Promise<{ slug: string }> }) {

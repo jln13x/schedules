@@ -5,6 +5,7 @@ export const metadata = pageMetadata({
   title: "Documentation",
   path: "/docs",
   description: DOC_PAGES.overview.description,
+  ownImage: true,
 });
 export default function DocumentationPage() {
   return <DocsPage slug="overview" />;

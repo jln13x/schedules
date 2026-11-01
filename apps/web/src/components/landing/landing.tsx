@@ -19,7 +19,6 @@ export function Landing({
     <>
       <section className="grid items-center gap-6 sm:gap-10 lg:grid-cols-2 lg:gap-14">
         <div className="min-w-0">
-          <h1 className="sr-only">The Agent Schedules Directory</h1>
           <img
             src="/brand/wordmark.svg"
             alt="Schedules"
@@ -27,9 +26,9 @@ export function Landing({
             height={60}
             className="h-auto max-w-full"
           />
-          <p className="mt-6 text-xl leading-snug tracking-tight text-balance sm:mt-8 sm:text-2xl">
+          <h1 className="mt-6 text-xl leading-snug font-normal tracking-tight text-balance sm:mt-8 sm:text-2xl">
             {PITCH}
-          </p>
+          </h1>
           <p className="text-muted-foreground mt-2 text-base sm:text-lg">{PROMISE}</p>
           <HeroActions className="mt-6 sm:mt-8" />
           <WorksWith className="mt-8 sm:mt-10" />

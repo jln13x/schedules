@@ -7,9 +7,9 @@ export const alt = SITE.title;
 
 export default function OpenGraphImage() {
   return ogImage({
-    title: "every day at 8, run a security audit",
-    subtitle: "Recurring tasks for AI coding agents",
-    prompt: true,
+    title: SITE.title,
+    subtitle: "Share it between harnesses and your team.",
+    command: "npx agent-schedules add <owner/repo/skill>",
     hour: 8,
   });
 }
