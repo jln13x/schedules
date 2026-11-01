@@ -189,7 +189,24 @@ export async function resolveSkill(
   throw new Error(
     `no installed skill named ${query}. ${
       installed.length > 0 ? `Installed here: ${installed.join(", ")}.` : "None is installed here."
-    } Install it first, for example: npx skills add <owner/repo> --skill ${query}`,
+    } Install and schedule it in one go with: npx agent-schedules add <owner/repo/skill>`,
+  );
+}
+
+/**
+ * The installs of one skill from skills.sh: the folder of that name whose lock entry names the
+ * repository, or that has none, since a copy installed by hand records nowhere it came from.
+ */
+export async function installedFrom(
+  source: { readonly owner: string; readonly repo: string; readonly skill: string },
+  repository: string | null,
+  home = homedir(),
+): Promise<Array<InstalledSkill>> {
+  const repo = `${source.owner}/${source.repo}`;
+  return (await installedSkills(repository, home)).filter(
+    (skill) =>
+      (skill.folder === source.skill || skill.name === source.skill) &&
+      (skill.source === undefined || skill.source === repo),
   );
 }
 

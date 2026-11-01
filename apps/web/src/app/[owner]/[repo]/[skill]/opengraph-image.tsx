@@ -17,7 +17,7 @@ export default async function OpenGraphImage({
   return ogImage({
     title: `Run ${skill?.name ?? slug} on a schedule`,
     ...(skill && { subtitle: schedule.label }),
-    command: `npx agent-schedules schedule ${slug} "${schedule.cron}"`,
+    command: `npx agent-schedules add ${owner}/${repo}/${slug}`,
     hour: schedule.hour,
   });
 }

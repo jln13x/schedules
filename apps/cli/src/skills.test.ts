@@ -84,7 +84,7 @@ describe("installed skills", () => {
   test("a missing skill says what is installed and how to install it", async () => {
     install(join(repo, ".agents/skills"), "triage");
     await expect(resolveSkill("standup", repo, home)).rejects.toThrow(
-      "no installed skill named standup. Installed here: triage. Install it first",
+      "no installed skill named standup. Installed here: triage. Install and schedule it in one go",
     );
   });
 });
