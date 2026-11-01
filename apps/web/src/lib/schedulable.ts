@@ -28,6 +28,19 @@ export const Schedulable = Decision.make({
         true: "Useful as a recurring job: it checks, summarizes, reports, cleans up, or maintains something by itself",
       },
     }),
+    // The question above lets linters, scrapers, style guides and setup steps through, since they
+    // also "check" things; what they are tells them apart from a job a timer can start.
+    kind: Decision.classify({
+      instructions:
+        "What kind of skill is this? Judge by what it does when it runs, not by how its description says to invoke it.",
+      criteria: {
+        job: "Does a self-contained piece of work on something that changes over time, such as an account, a deployment, a budget, a repository's recent activity or dependencies, a market or an inbox, and reports on, fixes or keeps up to date what it finds. A run needs nothing named by a person.",
+        tool: "Works on a target a person names each time: a URL, a file, a pull request, a campaign, code they just wrote, or a question.",
+        reference:
+          "Guidance, conventions or best practices an agent applies while doing other work.",
+        setup: "Configures, installs, integrates or migrates something, once.",
+      },
+    }),
     usefulness: Decision.rate({
       instructions:
         "How much does someone gain from having this run on a schedule, compared with running it by hand when they think of it?",
@@ -90,6 +103,7 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
   const levels = Schedulable.decisions.usefulness.criteria.length - 1;
   return {
     recurring: answers.recurring.probability,
+    job: answers.kind.probabilities.job,
     usefulness: Math.round((100 * answers.usefulness.rating) / levels),
     forTeam: answers.audience.probabilities.once,
     abuse: answers.abuse.probability,
@@ -98,8 +112,12 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
   };
 }
 
-/** On the labelled set, 0.5 keeps 19 or 20 of 22 good skills and one or two of 91 bad ones. */
+/**
+ * Both gates list a skill. On 182 labelled skills, recurring alone at 0.5 kept 31 of 34 good ones
+ * and 21 of 114 bad ones; with the job share also at 0.5 it keeps 29 good ones and 2 bad ones.
+ */
 export const SCHEDULABLE_THRESHOLD = 0.5;
+export const JOB_THRESHOLD = 0.5;
 
 /**
  * A skill shows under a fit when that answer's share is at least this, so a skill Jev splits

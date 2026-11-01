@@ -128,7 +128,9 @@ function SkillTable({ rows, sponsors }: { rows: SkillEntry[]; sponsors: SponsorE
                   <span className="text-muted-foreground font-mono text-xs">
                     {skill.owner}/{skill.repo}
                   </span>
-                  <span className="relative z-10">
+                  {/* Above the row's link so the badges take hover, and above the next row's
+                      badges while a tooltip is open, since each row stacks on its own. */}
+                  <span className="relative z-10 focus-within:z-20 hover:z-20">
                     <FitBadges fits={skill.fits} />
                   </span>
                 </div>

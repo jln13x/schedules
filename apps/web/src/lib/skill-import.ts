@@ -26,6 +26,7 @@ type Outcome = "classified" | "unchanged" | "missing" | "failed";
 const refreshSkill = Effect.fn("refreshSkill")(function* (skill: {
   id: string;
   classifiedHash: string | null;
+  job: number | null;
 }) {
   const skillsSh = yield* SkillsSh;
   const detail = yield* skillsSh.skill(skill.id);
@@ -39,7 +40,8 @@ const refreshSkill = Effect.fn("refreshSkill")(function* (skill: {
   const input = schedulableInput(skillMd);
   yield* markFetched(skill.id, { hash, description: input.description });
 
-  if (hash === skill.classifiedHash) {
+  // Answers from before a question was added are asked again, though the skill didn't change.
+  if (hash === skill.classifiedHash && skill.job !== null) {
     return "unchanged" satisfies Outcome;
   }
 

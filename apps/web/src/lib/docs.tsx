@@ -800,10 +800,11 @@ Use the triage skill: read .agents/skills/triage/SKILL.md and follow it. ...`}</
         <p>
           From <a href="https://skills.sh">skills.sh</a>, the directory of agent skills. Every hour
           schedules.sh reads the most installed skills there and asks a decision model which of them
-          do useful work on a timer, who should run them, and how often. Skills that pass are listed
-          with their install counts from skills.sh; forks and skills that failed a security audit
-          there are left out. To get a skill listed, publish it as a skill on GitHub and let it be
-          installed through skills.sh. Nothing is submitted here.
+          do useful work on a timer, who should run them, and how often. Tools you point at
+          something, guides an agent follows while working, and one-time setup steps are left out.
+          Skills that pass are listed with their install counts from skills.sh; forks and skills
+          that failed a security audit there are left out. To get a skill listed, publish it as a
+          skill on GitHub and let it be installed through skills.sh. Nothing is submitted here.
         </p>
         <H2>How are skills ranked?</H2>
         <p>

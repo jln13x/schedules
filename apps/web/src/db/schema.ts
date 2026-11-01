@@ -37,6 +37,8 @@ export const skills = SCHEDULES_SCHEMA.table(
     classifiedHash: text("classified_hash"),
     model: text("model"),
     recurring: doublePrecision("recurring"),
+    /** Share of "a job a timer can start" against a tool, a guide, or a setup step; null before asked. */
+    job: doublePrecision("job"),
     usefulness: integer("usefulness"),
     /** Share of "one run serves the team" against "each person runs it"; for you is one minus it. */
     forTeam: doublePrecision("for_team"),
