@@ -1,5 +1,5 @@
 import { expect, it } from "bun:test";
-import { compareVersions, verifiedLine, versionNumber } from "./verified.ts";
+import { VERIFIED, compareVersions, verifiedLine, versionNumber } from "./verified.ts";
 
 it("reads the number out of each agent's version output", () => {
   expect(versionNumber("codex-cli 0.164.0")).toBe("0.164.0");
@@ -15,8 +15,10 @@ it("compares versions by segment, not by string", () => {
 });
 
 it("says whether the installed version is verified", () => {
-  expect(verifiedLine("codex", "codex-cli 0.165.0")).toBe("verified: 0.165.0 (2026-10-28)");
-  expect(verifiedLine("codex", "codex-cli 0.170.0")).toContain("0.170.0 is newer and unverified");
+  // Read from the record, which every passing verification run moves forward.
+  const { version, date } = VERIFIED.codex ?? { version: "", date: "" };
+  expect(verifiedLine("codex", `codex-cli ${version}`)).toBe(`verified: ${version} (${date})`);
+  expect(verifiedLine("codex", "codex-cli 99.0.0")).toContain("99.0.0 is newer and unverified");
   expect(verifiedLine("codex", undefined)).toContain("installed version unknown");
   expect(verifiedLine("pi", "pi 1.0.0")).toContain("installed 1.0.0 is older");
 });
