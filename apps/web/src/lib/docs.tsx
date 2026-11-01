@@ -547,7 +547,7 @@ Review the repository for dependency updates.`}</code>
         </p>
         <H2>Where do the listed skills come from?</H2>
         <p>
-          From <a href="https://skills.sh">skills.sh</a>, the directory of agent skills. Every day
+          From <a href="https://skills.sh">skills.sh</a>, the directory of agent skills. Every hour
           schedules.sh reads the most installed skills there and asks a decision model which of them
           do useful work on a timer, who should run them, and how often. Skills that pass are listed
           with their install counts from skills.sh; forks and skills that failed a security audit
