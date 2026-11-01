@@ -13,14 +13,28 @@ describe("schedules", () => {
 
   test("cron rejects shapes the schedulers cannot express", () => {
     expect(() => parseSchedule(file('"*/5 * * * *"'), "example.md")).toThrow();
-    expect(() => parseSchedule(file('"0 9 1 * *"'), "example.md")).toThrow("Day of month");
+    expect(() => parseSchedule(file('"0 9 31 * *"'), "example.md")).toThrow("1 to 28");
+    expect(() => parseSchedule(file('"0 9 1 * 1"'), "example.md")).toThrow("* for weekdays");
+    expect(() => parseSchedule(file('"0 9 1 1 *"'), "example.md")).toThrow("Month");
     expect(() =>
       parseSchedule(file('"0 9 * * *"').replace("Example", '"!!!"'), "example.md"),
     ).toThrow("letter or digit");
     expect(typeof timingFromCron("0 */2 * * *")).toBe("string");
   });
 
+  test("a monthly cron keeps its day and round-trips", () => {
+    const schedule = parseSchedule(file('"0 8 1 * *"'), "example.md");
+    expect(schedule.timing).toEqual({ minute: 0, hour: 8, weekdays: null, monthDay: 1 });
+    expect(serializeSchedule(schedule)).toContain("schedule: 0 8 1 * *");
+  });
+
   test("timing reads as words", () => {
+    expect(describeTiming({ minute: 0, hour: 8, weekdays: null, monthDay: 1 })).toBe(
+      "Monthly on the 1st 08:00",
+    );
+    expect(describeTiming({ minute: 0, hour: 8, weekdays: null, monthDay: 22 })).toBe(
+      "Monthly on the 22nd 08:00",
+    );
     expect(describeTiming({ minute: 7, hour: 9, weekdays: [1, 2, 3, 4, 5] })).toBe(
       "Weekdays 09:07",
     );

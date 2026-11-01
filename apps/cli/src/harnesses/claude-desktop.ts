@@ -5,6 +5,7 @@ import {
   type HarnessDefinition,
   type LiveSchedule,
   type Platform,
+  type Saved,
   Harness,
   HarnessError,
   Workspace,
@@ -15,6 +16,7 @@ import {
   loose,
   readJson,
   readText,
+  removePath,
   writeJsonAtomic,
   writeText,
 } from "../harness.ts";
@@ -181,18 +183,34 @@ const stalls = (mode: string) => mode === "default" || mode === "acceptEdits";
 const toDate = (value: number | string) =>
   new Date(typeof value === "number" ? (value < 1e12 ? value * 1000 : value) : value);
 
+// Settings the manifest may carry beside the schedule; pushes keep every field either way.
+const SETTINGS = ["permissionMode", "model"] as const;
+
 const toLive = (task: ClaudeTask) =>
   Effect.gen(function* () {
     const name = title(task);
+    const settings = Object.fromEntries(
+      SETTINGS.flatMap((key) => (typeof task[key] === "string" ? [[key, task[key]]] : [])),
+    );
     const base = {
+      id: task.id,
       name,
       status: task.enabled ? "active" : "paused",
+      workspace: task.cwd,
       lastRun: task.lastRunAt === undefined ? undefined : { at: toDate(task.lastRunAt) },
+      settings,
     } as const;
+    // A task whose file is gone still lists, with what the manifest says about it.
+    const prompt = yield* readText(skillPath(task.id)).pipe(
+      Effect.flatMap(parseSkill),
+      Effect.map((skill) => skill.prompt),
+      Effect.orElseSucceed(() => undefined),
+    );
 
     if (task.cronExpression === undefined) {
       return {
         ...base,
+        prompt,
         unsupported:
           task.fireAt === undefined
             ? "manual tasks have no schedule"
@@ -202,12 +220,15 @@ const toLive = (task: ClaudeTask) =>
 
     const timing = timingFromCron(task.cronExpression);
 
-    if (typeof timing === "string") {
-      return { ...base, unsupported: timing } satisfies LiveSchedule;
+    if (typeof timing === "string" || prompt === undefined) {
+      return {
+        ...base,
+        prompt,
+        unsupported: typeof timing === "string" ? timing : `${skillPath(task.id)} is missing`,
+      } satisfies LiveSchedule;
     }
 
-    const skill = yield* parseSkill(yield* readText(skillPath(task.id)));
-    return { ...base, schedule: { name, timing, prompt: skill.prompt } } satisfies LiveSchedule;
+    return { ...base, schedule: { name, timing, prompt } } satisfies LiveSchedule;
   });
 
 const make = Effect.gen(function* () {
@@ -225,13 +246,20 @@ const make = Effect.gen(function* () {
   );
   const mine = (tasks: ReadonlyArray<ClaudeTask>) => tasks.filter((task) => task.cwd === cwd);
 
-  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule) {
+  const save = Effect.fn(function* ({ name, timing, prompt }: Schedule, target?: string) {
     if (yield* appIsRunning) {
       return yield* fail(OPEN);
     }
 
     const current = manifest ?? (yield* loadManifest);
-    const existing = mine(current.scheduledTasks).find((task) => title(task) === name);
+    const existing =
+      target === undefined
+        ? mine(current.scheduledTasks).find((task) => title(task) === name)
+        : current.scheduledTasks.find((task) => task.id === target);
+
+    if (target !== undefined && !existing) {
+      return yield* fail(`Claude Desktop has no task ${target} any more`);
+    }
     const cronExpression = formatCron(timing);
 
     if (existing) {
@@ -244,7 +272,7 @@ const make = Effect.gen(function* () {
         scheduledTasks: current.scheduledTasks.map((task) => (task === existing ? updated : task)),
       };
       yield* writeJsonAtomic(manifestPath, manifest);
-      return undefined;
+      return { id: existing.id } satisfies Saved;
     }
 
     const taken = new Set(current.scheduledTasks.map((task) => task.id));
@@ -275,9 +303,12 @@ const make = Effect.gen(function* () {
     };
     yield* writeJsonAtomic(manifestPath, manifest);
     const { mode } = yield* defaultMode(cwd);
-    return stalls(mode)
-      ? `${describeMode(mode)}: click Run now in the app and choose Always allow, or change the task's mode`
-      : describeMode(mode);
+    return {
+      id,
+      note: stalls(mode)
+        ? `${describeMode(mode)}: click Run now in the app and choose Always allow, or change the task's mode`
+        : describeMode(mode),
+    } satisfies Saved;
   });
 
   return Harness.of({
@@ -293,7 +324,7 @@ const make = Effect.gen(function* () {
         Effect.map((open) => (open ? OPEN : undefined)),
         Effect.provideContext(services),
       ),
-    save: (schedule) => save(schedule).pipe(Effect.provideContext(services)),
+    save: (schedule, id) => save(schedule, id).pipe(Effect.provideContext(services)),
   });
 });
 
@@ -326,4 +357,46 @@ const doctor = Effect.gen(function* () {
   ];
 });
 
-export const claudeDesktop: HarnessDefinition = { layer: Layer.effect(Harness, make), doctor };
+const inventory = Effect.gen(function* () {
+  const { scheduledTasks } = yield* readJson(yield* locateManifest, manifestSchema, {
+    scheduledTasks: [],
+  });
+  return yield* Effect.forEach(scheduledTasks, toLive);
+});
+
+/** Rewrites the manifest with one task changed, or without it, while the app is closed. */
+const editTask = (id: string, edit: (task: ClaudeTask) => ClaudeTask | undefined) =>
+  Effect.gen(function* () {
+    if (yield* appIsRunning) {
+      return yield* fail(OPEN);
+    }
+
+    const manifestPath = yield* locateManifest;
+    const manifest = yield* readJson(manifestPath, manifestSchema, { scheduledTasks: [] });
+    const task = manifest.scheduledTasks.find((candidate) => candidate.id === id);
+
+    if (!task) {
+      return yield* fail(`Claude Desktop has no task ${id}`);
+    }
+
+    const edited = edit(task);
+    yield* writeJsonAtomic(manifestPath, {
+      ...manifest,
+      scheduledTasks: manifest.scheduledTasks.flatMap((candidate) =>
+        candidate !== task ? [candidate] : edited ? [edited] : [],
+      ),
+    });
+    return task;
+  });
+
+export const claudeDesktop: HarnessDefinition = {
+  layer: Layer.effect(Harness, make),
+  doctor,
+  inventory,
+  setEnabled: (id, enabled) => editTask(id, (task) => ({ ...task, enabled })).pipe(Effect.asVoid),
+  remove: (id) =>
+    editTask(id, () => undefined).pipe(
+      Effect.flatMap(() => removePath(join(tasksDir(), id))),
+      Effect.as(undefined),
+    ),
+};

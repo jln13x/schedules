@@ -17,6 +17,8 @@ export const claudeCode: Agent = {
     ],
     stdin: prompt,
   }),
+  // Verified: reads outside the working directory are denied in dontAsk and acceptEdits.
+  confined: ["read", "edit"],
   // dontAsk and acceptEdits deny, rather than wait for, anything the user's settings don't allow.
   limits: {
     read: "commands need allow rules in your user-level Claude Code settings",

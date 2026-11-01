@@ -6,7 +6,7 @@ import { cronHarness } from "./cron/index.ts";
 import { t3 } from "./t3.ts";
 
 export { COMMAND_LINE_AGENTS } from "./agents.ts";
-export { ACCESS, type Access, listJobs, removeJob, runJob } from "./cron/index.ts";
+export { ACCESS, type Access, runJob } from "./cron/index.ts";
 
 /** Apps that schedule tasks themselves, then the agent CLIs this tool schedules with cron. */
 export const HARNESSES = ["t3", "codex-desktop", "claude-desktop", ...COMMAND_LINE_AGENTS] as const;

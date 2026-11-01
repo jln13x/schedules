@@ -29,6 +29,7 @@
         "commander": "catalog:",
         "effect": "catalog:",
         "smol-toml": "catalog:",
+        "yaml": "catalog:",
       },
     },
     "apps/web": {

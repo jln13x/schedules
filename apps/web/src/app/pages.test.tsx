@@ -64,6 +64,7 @@ it("distinguishes checkout statuses and renders a skill page from its listing", 
     expect(markup).not.toContain("on a schedule</h1>");
     expect(markup).toContain("npx skills add acme/tools --skill daily");
     expect(markup).toContain("agent-schedules schedule daily &quot;0 8 * * 1-5&quot;");
+    expect(markup).toContain("agent-schedules push &lt;harness&gt;");
     expect(markup).toContain(">Team<");
     expect(markup).not.toContain(">You<");
     expect(markup).toContain("08:00");

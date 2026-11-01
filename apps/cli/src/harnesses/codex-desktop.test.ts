@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Effect } from "effect";
 import { codexDesktop, fromRrule, toRrule } from "./codex-desktop.ts";
 import { connect, run } from "../harness.ts";
 
@@ -16,6 +17,12 @@ test("Codex rules convert both ways", () => {
     hour: 17,
     weekdays: [0, 2],
   });
+  const monthly = { minute: 0, hour: 9, weekdays: null, monthDay: 1 };
+  expect(toRrule(monthly)).toBe("FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=9;BYMINUTE=0;BYSECOND=0");
+  expect(fromRrule("RRULE:FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=9;BYMINUTE=0")).toEqual(monthly);
+  expect(typeof fromRrule("FREQ=MONTHLY;BYMONTHDAY=31;BYHOUR=9;BYMINUTE=0")).toBe("string");
+  expect(typeof fromRrule("FREQ=MONTHLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0")).toBe("string");
+  expect(typeof fromRrule("FREQ=WEEKLY;BYMONTHDAY=1;BYDAY=MO;BYHOUR=9;BYMINUTE=0")).toBe("string");
   expect(typeof fromRrule("FREQ=HOURLY;BYMINUTE=10")).toBe("string");
   expect(typeof fromRrule("FREQ=WEEKLY;BYHOUR=9;BYMINUTE=0")).toBe("string");
   expect(typeof fromRrule("FREQ=DAILY;BYHOUR=;BYMINUTE=0")).toBe("string");
@@ -40,9 +47,10 @@ test.skipIf(process.platform !== "linux")(
         timing: { minute: 0, hour: 8, weekdays: null },
         prompt: "Audit",
       };
-      expect(await run(adapter.save(schedule))).toBe(
-        "written; install sqlite3 to confirm the Codex app loaded it",
-      );
+      expect(await run(adapter.save(schedule))).toEqual({
+        id: "audit",
+        note: "written; install sqlite3 to confirm the Codex app loaded it",
+      });
       await writeFile(
         join(bin, "sqlite3"),
         `#!/bin/sh
@@ -76,7 +84,7 @@ esac
       ] as const) {
         await writeFile(join(bin, "mode"), `${mode}\n`);
         await writeFile(join(bin, "count"), "0\n");
-        expect(await run(adapter.save(schedule))).toBe(note);
+        expect((await run(adapter.save(schedule))).note).toBe(note);
         expect(Number(await readFile(join(bin, "count"), "utf8"))).toBe(attempts);
       }
     } finally {
@@ -87,3 +95,54 @@ esac
   },
   15_000,
 );
+
+test("Codex automations pause, update and remove by id, and shared ones are left to the app", async () => {
+  const root = await mkdtemp(join(tmpdir(), "codex-desktop-"));
+  const saved = { codexHome: process.env.CODEX_HOME };
+  const write = (id: string, cwds: ReadonlyArray<string>) =>
+    mkdir(join(root, "automations", id), { recursive: true }).then(() =>
+      writeFile(
+        join(root, "automations", id, "automation.toml"),
+        `version = 1\nid = "${id}"\nkind = "cron"\nname = "${id}"\nprompt = "Run ${id}."\nstatus = "ACTIVE"\nrrule = "FREQ=WEEKLY;BYDAY=MO;BYHOUR=8;BYMINUTE=0"\nexecution_environment = "worktree"\ncwds = [${cwds.map((cwd) => `"${cwd}"`).join(", ")}]\n`,
+      ),
+    );
+
+  try {
+    process.env.CODEX_HOME = root;
+    await write("audit", [join(root, "repo")]);
+    await write("shared", ["/a", "/b"]);
+
+    const all = await run(codexDesktop.inventory);
+    expect(all.find((live) => live.id === "audit")).toMatchObject({
+      workspace: join(root, "repo"),
+      settings: { kind: "cron", execution_environment: "worktree" },
+    });
+    expect(all.find((live) => live.id === "shared")).toMatchObject({
+      workspace: undefined,
+      settings: { workspaces: "/a, /b" },
+    });
+
+    await run(codexDesktop.setEnabled?.("audit", false) ?? Effect.succeed(undefined));
+    const adapter = await connect(codexDesktop, { cwd: join(root, "repo") });
+    await run(
+      adapter.save(
+        { name: "Renamed", timing: { minute: 0, hour: 9, weekdays: null }, prompt: "Run it." },
+        "audit",
+      ),
+    );
+    const record = await readFile(join(root, "automations/audit/automation.toml"), "utf8");
+    // Renamed and rescheduled, still paused, still in its worktree.
+    expect(record).toContain('name = "Renamed"');
+    expect(record).toContain('status = "PAUSED"');
+    expect(record).toContain('execution_environment = "worktree"');
+
+    expect(run(codexDesktop.remove?.("shared") ?? Effect.succeed(undefined))).rejects.toThrow(
+      "shared by 2",
+    );
+    await run(codexDesktop.remove?.("audit") ?? Effect.succeed(undefined));
+    expect((await run(codexDesktop.inventory)).map((live) => live.id)).toEqual(["shared"]);
+  } finally {
+    process.env.CODEX_HOME = saved.codexHome;
+    await rm(root, { recursive: true, force: true });
+  }
+});
