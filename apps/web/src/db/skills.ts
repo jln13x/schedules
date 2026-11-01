@@ -1,7 +1,12 @@
-import { and, desc, eq, ilike, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { type Fit, isCadence, isTimeOfDay, suggestedSchedule } from "@/lib/cadence";
-import { ABUSE_THRESHOLD, FIT_THRESHOLD, SCHEDULABLE_THRESHOLD } from "@/lib/schedulable";
+import {
+  ABUSE_THRESHOLD,
+  FIT_THRESHOLD,
+  JOB_THRESHOLD,
+  SCHEDULABLE_THRESHOLD,
+} from "@/lib/schedulable";
 import type { ListedSkill } from "@/lib/skills-sh";
 import { Database } from "./database";
 import { skills } from "./schema";
@@ -58,11 +63,14 @@ export const upsertListedSkills = Effect.fn("upsertListedSkills")(function* (
   return rows.length;
 });
 
-/** Skills never fetched, or not fetched for a week, most installed first. */
+/**
+ * Skills never fetched, not fetched for a week, or classified before Jev was asked what kind of
+ * skill each is, most installed first.
+ */
 export const skillsDue = Effect.fn("skillsDue")(function* (limit: number) {
   return yield* Database.query((db) =>
     db
-      .select({ id: skills.id, classifiedHash: skills.classifiedHash })
+      .select({ id: skills.id, classifiedHash: skills.classifiedHash, job: skills.job })
       .from(skills)
       .where(
         and(
@@ -70,6 +78,7 @@ export const skillsDue = Effect.fn("skillsDue")(function* (limit: number) {
           or(
             isNull(skills.fetchedAt),
             lt(skills.fetchedAt, sql`now() - ${REFETCH_AFTER}::interval`),
+            and(isNotNull(skills.classifiedHash), isNull(skills.job)),
           ),
         ),
       )
@@ -96,6 +105,7 @@ export const saveClassification = Effect.fn("saveClassification")(function* (
     hash: string;
     model: string;
     recurring: number;
+    job: number;
     usefulness: number;
     forTeam: number;
     abuse: number;
@@ -119,6 +129,7 @@ const score = sql<number>`${skills.usefulness} * log(${skills.installs} + 10)`.m
 const LISTED = and(
   eq(skills.duplicate, false),
   sql`${skills.recurring} >= ${SCHEDULABLE_THRESHOLD}`,
+  sql`${skills.job} >= ${JOB_THRESHOLD}`,
   sql`${skills.abuse} < ${ABUSE_THRESHOLD}`,
   isNull(skills.hidden),
   or(isNull(skills.audit), ne(skills.audit, "fail")),

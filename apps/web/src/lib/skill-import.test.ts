@@ -29,6 +29,11 @@ const FakeJev = Layer.effect(
         return {
           answers: {
             recurring: { _tag: "Probability", probability: recurring },
+            kind: {
+              _tag: "Classify",
+              label: "job",
+              probabilities: { job: 0.9, tool: 0.1, reference: 0, setup: 0 },
+            },
             usefulness: {
               _tag: "Rate",
               rating: 2,
@@ -155,6 +160,19 @@ DATABASE_TEST(
       });
       expect(decisions).toBe(2);
       expect(await run(importSkills(options), fetch)).toMatchObject({ due: 0 });
+
+      // Answers from before the kind question are asked again, though the skill didn't change.
+      await run(
+        Database.query((db) =>
+          db
+            .update(skills)
+            .set({ job: null })
+            .where(like(skills.id, "test-acme/tools/morning-brief")),
+        ),
+        fetch,
+      );
+      expect(await run(importSkills(options), fetch)).toMatchObject({ due: 1, classified: 1 });
+      expect(decisions).toBe(3);
     } finally {
       await run(
         Database.query((db) => db.delete(skills).where(like(skills.id, "test-%"))),

@@ -6,6 +6,7 @@ import {
   ABUSE_THRESHOLD,
   FIT_THRESHOLD,
   JEV_MODEL,
+  JOB_THRESHOLD,
   Schedulable,
   SCHEDULABLE_THRESHOLD,
   schedulableInput,
@@ -77,13 +78,19 @@ for (const threshold of [0.3, SCHEDULABLE_THRESHOLD, 0.7]) {
     `at ${threshold}${threshold === SCHEDULABLE_THRESHOLD ? " (current)" : ""}: keeps ${count(kept, "yes")}/${good.length} good, ${count(kept, "maybe")} borderline, ${count(kept, "no")} bad`,
   );
 }
+const listed = rows.filter(
+  (row) => row.recurring >= SCHEDULABLE_THRESHOLD && row.job >= JOB_THRESHOLD,
+);
+console.log(
+  `with job >= ${JOB_THRESHOLD} (listed): keeps ${count(listed, "yes")}/${good.length} good, ${count(listed, "maybe")} borderline, ${count(listed, "no")} bad`,
+);
 console.log(`\nabuse >= ${ABUSE_THRESHOLD}:`);
 for (const row of rows.filter((row) => row.abuse >= ABUSE_THRESHOLD)) {
   console.log(`  ${row.abuse.toFixed(2)} ${row.id}`);
 }
-console.log("\nbad skills scored highest:");
-for (const row of bad.slice(0, 5)) {
-  console.log(`  ${row.recurring.toFixed(2)} ${row.id}`);
+console.log("\nbad skills that would be listed:");
+for (const row of listed.filter((row) => row.label === "no")) {
+  console.log(`  recurring ${row.recurring.toFixed(2)}, job ${row.job.toFixed(2)} ${row.id}`);
 }
 console.log(`\ngood skills (fits count at ${FIT_THRESHOLD}):`);
 console.table(
@@ -91,6 +98,7 @@ console.table(
     skill: row.id,
     recurring: row.recurring.toFixed(2),
     useful: row.usefulness,
+    job: row.job.toFixed(2),
     team: row.forTeam.toFixed(2),
     abuse: row.abuse.toFixed(2),
     cadence: row.cadence,
