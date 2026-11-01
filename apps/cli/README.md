@@ -15,3 +15,5 @@ npx agent-schedules doctor <harness>
 Works with T3 Code, the Codex and Claude desktop apps, and the Codex, Claude Code, Pi, OpenCode and Cursor CLIs. Scheduling the CLIs needs cron, on macOS or Linux.
 
 Install skills with `npx skills add`, then schedule them. Every command takes `--ssh <host>` to run on another machine, and `list --all --json` gives other tools, such as launchers, every task with what can be done to it. Read the [docs](https://schedules.sh/docs/cli) for every command and option, and find skills worth scheduling at [schedules.sh](https://schedules.sh).
+
+Releases are published from this repository's GitHub Actions with [npm provenance](https://docs.npmjs.com/generating-provenance-statements), so each version on npm links to the commit and workflow that built it. `npm audit signatures` checks it.
