@@ -9,6 +9,10 @@ import { SuggestedSchedule } from "@/components/suggested-schedule";
 import { compactNumber, githubUrl, pageMetadata, SITE, skillPath, skillsShUrl } from "@/lib/site";
 import { cachedSkill } from "@/server/cached";
 
+// No loading shell: the skill comes from the cache, so there is nothing worth streaming a
+// placeholder for, and a skill that isn't listed goes straight to the not-found page.
+export const instant = false;
+
 interface SkillPageProps {
   params: Promise<{ owner: string; repo: string; skill: string }>;
 }
