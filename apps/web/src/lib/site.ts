@@ -4,24 +4,9 @@ export const SITE = {
   name: "schedules.sh",
   title: "The Agent Schedules Directory",
   origin: "https://schedules.sh",
-  description: "Discover and install schedules for AI coding agents.",
+  description: "Agent skills worth running on a schedule, and how often.",
 };
 export const GITHUB_URL = "https://github.com/jln13x/schedules";
-
-export const RESERVED_OWNERS: readonly string[] = [
-  "docs",
-  "sponsor",
-  "submit",
-  "privacy",
-  "terms",
-  "api",
-  "llms.txt",
-  "sitemap.xml",
-  "robots.txt",
-  "opengraph-image",
-  "u",
-  "_next",
-];
 
 export const SITE_METADATA: Metadata = {
   metadataBase: new URL(SITE.origin),
@@ -66,12 +51,18 @@ function social({
   } satisfies Metadata;
 }
 
-export function repositoryPath(repository: { owner: string; repo: string }) {
-  return `/${repository.owner}/${repository.repo}`;
+export function skillPath(skill: { owner: string; repo: string; slug: string }) {
+  return `/${skill.owner}/${skill.repo}/${skill.slug}`;
 }
 
-export function schedulePath(schedule: { owner: string; repo: string; name: string }) {
-  return `${repositoryPath(schedule)}/${schedule.name}`;
+const SKILLS_SH = "https://skills.sh";
+
+export function skillsShUrl(skill: { owner: string; repo: string; slug: string }) {
+  return `${SKILLS_SH}${skillPath(skill)}`;
+}
+
+export function githubUrl(repository: { owner: string; repo: string }) {
+  return `https://github.com/${repository.owner}/${repository.repo}`;
 }
 
 export function compactNumber(value: number) {

@@ -23,9 +23,6 @@ export function SiteHeader() {
           GitHub
         </a>
         <FeedbackDialog kind="feedback" />
-        <Link href="/submit" className="hover:text-foreground">
-          Submit
-        </Link>
       </nav>
     </header>
   );

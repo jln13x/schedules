@@ -45,10 +45,10 @@ export function HeroActions({ className }: { className?: string }) {
   return (
     <div className={cn("grid grid-cols-2 gap-3 sm:flex", className)}>
       <DitherButton asChild size="lg" className="px-3 sm:px-5">
-        <Link href="/submit">Submit a schedule</Link>
+        <a href="#skills">Browse skills</a>
       </DitherButton>
       <DitherButton asChild size="lg" variant="outline" className="px-3 sm:px-5">
-        <a href="#schedules">Browse schedules</a>
+        <Link href="/docs">How it works</Link>
       </DitherButton>
     </div>
   );

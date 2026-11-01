@@ -1,5 +1,3 @@
-import type { CSSProperties } from "react";
-
 import { getThresholdMap } from "@/lib/dither/matrices";
 import type { DitherMatrix } from "@/lib/dither/matrices";
 import { cssColor } from "@/lib/dither/tokens";
@@ -47,7 +45,7 @@ export interface DitherMaskOptions {
   /**
    * Cell size in CSS pixels. When set, the image has that intrinsic size
    * and tiles without a `mask-size`. Leave it unset to size the tile
-   * yourself, for example with `ditherMaskStyle`.
+   * yourself.
    */
   cell?: number;
 }
@@ -61,38 +59,6 @@ export const ditherMask = (level: number, { matrix = "bayer4", cell }: DitherMas
   const dimensions = cell === undefined ? "" : ` width="${size * cell}" height="${size * cell}"`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}"${dimensions} shape-rendering="crispEdges"><path d="${ditherPath(level, matrix)}"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-};
-
-export interface DitherMaskStyleOptions {
-  /** Threshold matrix. Default `"bayer4"`. */
-  matrix?: DitherMatrix;
-  /** Cell size: CSS pixels, or any CSS length. Default `var(--dither-cell)`. */
-  cell?: number | string;
-}
-
-/**
- * Inline styles that mask an element to one dither level, tiled at the
- * cell size. Pair with a background colour such as `bg-dither-ink`.
- *
- * ```tsx
- * <div className="bg-dither-ink" style={ditherMaskStyle(0.5)} />
- * ```
- */
-export const ditherMaskStyle = (
-  level: number,
-  { matrix = "bayer4", cell = "var(--dither-cell)" }: DitherMaskStyleOptions = {},
-): CSSProperties => {
-  const { size } = getThresholdMap(matrix);
-  const image = ditherMask(level, { matrix });
-  const tile = typeof cell === "number" ? `${size * cell}px` : `calc(${cell} * ${size})`;
-  return {
-    WebkitMaskImage: image,
-    WebkitMaskRepeat: "repeat",
-    WebkitMaskSize: tile,
-    maskImage: image,
-    maskRepeat: "repeat",
-    maskSize: tile,
-  };
 };
 
 export interface DitherPatternProps {

@@ -2,7 +2,6 @@ import { mock } from "bun:test";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { PgliteDatabase } from "@/db/pglite";
-import { GitHub } from "@/lib/github";
 
 // Shared so test files reuse one in-memory database rather than booting PGlite each.
 const memoMap = Layer.makeMemoMapUnsafe();
@@ -10,7 +9,7 @@ const memoMap = Layer.makeMemoMapUnsafe();
 export const testRuntime = <R, E>(layer: Layer.Layer<R, E>) =>
   ManagedRuntime.make(layer, { memoMap });
 
-export const TestServices = Layer.mergeAll(PgliteDatabase, GitHub.layer);
+export const TestServices = PgliteDatabase;
 
 /** Answers requests from a table of URLs with a Response, JSON, or text; 404 for the rest. */
 export function fakeFetch(routes: Record<string, unknown>) {

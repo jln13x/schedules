@@ -1,9 +1,7 @@
-import type { ComponentProps } from "react";
-
 import type { DitherMatrix } from "@/lib/dither/matrices";
 import { DitherPattern } from "@/lib/dither/pattern";
-import { bloomLayerStyle, ditherRamp, fillTile } from "@/lib/dither/style";
-import type { Bloom, FillEdge, FillVariant } from "@/lib/dither/style";
+import { ditherRamp, fillTile } from "@/lib/dither/style";
+import type { FillEdge, FillVariant } from "@/lib/dither/style";
 import { cssColor } from "@/lib/dither/tokens";
 import type { DitherColor } from "@/lib/dither/tokens";
 
@@ -111,20 +109,5 @@ export const FillPattern = ({
     >
       <path d={tile.path} transform={`scale(${cell})`} style={ink} />
     </pattern>
-  );
-};
-
-export interface BloomGroupProps extends ComponentProps<"g"> {
-  bloom: Bloom;
-}
-
-/**
- * An SVG group drawn as a glow: put solid copies of your shapes inside
- * and render it before (under) the real fills. Renders nothing when off.
- */
-export const BloomGroup = ({ bloom, style, ...props }: BloomGroupProps) => {
-  const layer = bloomLayerStyle(bloom);
-  return layer === undefined ? null : (
-    <g aria-hidden="true" {...props} style={{ ...layer, ...style }} />
   );
 };

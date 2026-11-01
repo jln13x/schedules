@@ -1,7 +1,7 @@
 import { expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 
-it("distinguishes checkout statuses and omits empty sibling sections", () => {
+it("distinguishes checkout statuses and renders a skill page from its listing", () => {
   const result = spawnSync(
     process.execPath,
     [
@@ -52,26 +52,31 @@ it("distinguishes checkout statuses and omits empty sibling sections", () => {
     session.payment_status = "paid";
     expect(await renderStatus("cs_test_fixture12345")).toContain("Thanks for supporting schedules.sh");
 
-    const schedule = { id: 1, owner: "acme", repo: "tools", name: "daily", displayName: "Daily", cron: "0 9 * * *", prompt: "Review this repository.\\n\\n![pixel](https://tracker.example/p.png)", description: "Fixture", installs: 0, history: [], firstSeenAt: new Date() };
-    let repository = [schedule];
-    mock.module("@/server/cached", () => ({ SCHEDULES_TAG: "schedules", cachedSchedule: async () => schedule, cachedRepository: async () => repository }));
+    const skill = { id: "acme/tools/daily", owner: "acme", repo: "tools", slug: "daily", name: "daily", description: "Review the repository <img src=x onerror=alert(1)>", installs: 1200, usefulness: 67, forTeam: 0.95, cadence: "weekdays", time: "morning", schedule: { cron: "0 8 * * 1-5", hour: 8, weekdays: [1, 2, 3, 4, 5], monthDay: null, label: "Every weekday at 08:00", days: "Every weekday", time: "08:00" }, audit: "pass", firstSeenAt: new Date(), score: 1, fits: { you: false, team: true } };
+    let found = skill;
+    mock.module("@/server/cached", () => ({ SKILLS_TAG: "skills", cachedSkill: async () => found }));
     mock.module("next/cache", () => ({ updateTag() {} }));
-    mock.module("@/db", () => ({ resolveRepository: () => Effect.succeed(undefined) }));
-    mock.module("next/navigation", () => ({ notFound() { throw new Error("Missing schedule"); }, permanentRedirect() { throw new Error("Unexpected redirect"); }, usePathname: () => "/acme/tools/daily" }));
-    const { default: SchedulePage } = await import("./src/app/[owner]/[repo]/[name]/page.tsx");
-    const renderSchedule = async () => renderToStaticMarkup(await SchedulePage({ params: Promise.resolve(schedule) }));
-    const alone = await renderSchedule();
-    expect(alone).not.toContain("More from");
-    expect(alone).not.toContain("<img");
-    expect(alone).not.toContain("tracker.example");
-    repository = [schedule, { ...schedule, id: 2, name: "weekly" }];
-    const markup = await renderSchedule();
-    expect(markup).toContain("More from");
-    expect(markup).toContain("/acme/tools/weekly");
-    const { Panel } = await import("./src/components/panel.tsx");
-    const panel = renderToStaticMarkup(createElement(Panel, { className: "p-6" }, "Prompt"));
-    expect(panel).toContain("Prompt");
-    expect(panel).not.toContain("<svg");
+    mock.module("next/navigation", () => ({ notFound() { throw new Error("404"); }, usePathname: () => "/acme/tools/daily" }));
+    const page = await import("./src/app/[owner]/[repo]/[skill]/page.tsx");
+    const render = async (params) => renderToStaticMarkup(await page.default({ params: Promise.resolve(params) }));
+    const markup = await render({ owner: "acme", repo: "tools", skill: "daily" });
+    expect(markup).toContain(">daily</h1>");
+    expect(markup).not.toContain("on a schedule</h1>");
+    expect(markup).toContain("npx skills add acme/tools --skill daily");
+    expect(markup).toContain("agent-schedules schedule daily &quot;0 8 * * 1-5&quot;");
+    expect(markup).toContain(">Team<");
+    expect(markup).not.toContain(">You<");
+    expect(markup).toContain("08:00");
+    expect(markup).toContain("Every weekday");
+    expect(markup).toContain("https://github.com/acme/tools");
+    expect(markup).toContain("https://skills.sh/acme/tools/daily");
+    expect(markup).not.toContain("<img");
+    expect(markup).toContain("&lt;img");
+    found = undefined;
+    await expect(render({ owner: "acme", repo: "tools", skill: "daily" })).rejects.toThrow("404");
+    for (const params of [{ owner: "a/b", repo: "tools", skill: "daily" }, { owner: "acme", repo: "tools", skill: "Daily" }, { owner: "acme", repo: "..", skill: "daily" }]) {
+      await expect(page.generateMetadata({ params: Promise.resolve(params) })).rejects.toThrow("404");
+    }
   `,
     ],
     {

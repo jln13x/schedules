@@ -1,13 +1,14 @@
 import type { SearchParams } from "nuqs/server";
 import { Suspense } from "react";
-import { leaderboardEntry, sponsorEntry } from "@/db";
+import { sponsorEntry } from "@/db";
+import { listingOf } from "@/db/skills";
 import { Landing } from "@/components/landing/landing";
-import { Leaderboard } from "@/components/leaderboard";
 import { Loading } from "@/components/loading";
+import { SkillList } from "@/components/skill-list";
 import type { SponsorEntry } from "@/components/sponsor-row";
-import { loadLeaderboardParams } from "@/lib/search-params";
+import { loadSkillsParams } from "@/lib/search-params";
 import { pageMetadata, SITE } from "@/lib/site";
-import { cachedLeaderboard, cachedShowcase, cachedSponsors } from "@/server/cached";
+import { cachedShowcase, cachedSkills, cachedSponsors } from "@/server/cached";
 
 export const metadata = {
   ...pageMetadata({
@@ -17,7 +18,7 @@ export const metadata = {
   }),
   title: "The Agent Schedules Directory",
 };
-const LEADERBOARD_LIMIT = 100;
+const LIST_LIMIT = 100;
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [showcase, sponsors] = await Promise.all([cachedShowcase(), cachedSponsors()]);
@@ -25,29 +26,29 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <Landing
       showcase={showcase}
-      leaderboard={
-        // The search query comes from the URL, so this part renders per request; the rest is static.
-        <Suspense fallback={<Loading label="Loading schedules" />}>
-          <LeaderboardSection searchParams={searchParams} sponsors={sponsorEntries} />
+      skills={
+        // The search and filter come from the URL, so this part renders per request; the rest is static.
+        <Suspense fallback={<Loading label="Loading skills" />}>
+          <SkillsSection searchParams={searchParams} sponsors={sponsorEntries} />
         </Suspense>
       }
     />
   );
 }
 
-async function LeaderboardSection({
+async function SkillsSection({
   searchParams,
   sponsors,
 }: {
   searchParams: Promise<SearchParams>;
   sponsors: SponsorEntry[];
 }) {
-  const { q, period } = await loadLeaderboardParams(searchParams);
-  const rows = await cachedLeaderboard({ query: q, period, limit: LEADERBOARD_LIMIT + 1 });
+  const { q, fit } = await loadSkillsParams(searchParams);
+  const rows = await cachedSkills({ query: q, ...(fit ? { fit } : {}), limit: LIST_LIMIT + 1 });
   return (
-    <Leaderboard
-      schedules={rows.slice(0, LEADERBOARD_LIMIT).map(leaderboardEntry)}
-      truncated={rows.length > LEADERBOARD_LIMIT}
+    <SkillList
+      skills={rows.slice(0, LIST_LIMIT).map(listingOf)}
+      truncated={rows.length > LIST_LIMIT}
       sponsors={sponsors}
     />
   );

@@ -67,10 +67,19 @@ export const Schedulable = Decision.make({
     cadence: Decision.classify({
       instructions: "If it ran on a schedule, how often would running it be most useful?",
       criteria: {
-        daily: "Every day",
-        weekdays: "Every weekday morning",
+        daily: "Every day, including weekends",
+        weekdays: "Every working day",
         weekly: "Once a week",
-        monthly: "Once a month",
+        monthly: "Once a month, or less often",
+      },
+    }),
+    time: Decision.classify({
+      instructions:
+        "At what time of the working day is its result most useful? It runs on the person's own computer, which may be asleep at night.",
+      criteria: {
+        morning: "At the start of the day, to prepare or brief before work begins",
+        midday: "Around midday, when timing does not matter much",
+        evening: "At the end of the day, to wrap up, summarize, or back up the day's work",
       },
     }),
   },
@@ -85,6 +94,7 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
     forTeam: answers.audience.probabilities.once,
     abuse: answers.abuse.probability,
     cadence: answers.cadence.label,
+    time: answers.time.label,
   };
 }
 
@@ -92,8 +102,8 @@ export function schedulableScores(answers: Decision.Answers<typeof Schedulable.d
 export const SCHEDULABLE_THRESHOLD = 0.5;
 
 /**
- * A skill shows under "for you" when the team share is at most this, and under "for your team" when
- * it is at least one minus this, so a skill that works both ways appears in both.
+ * A skill shows under a fit when that answer's share is at least this, so a skill Jev splits
+ * evenly between "each person runs it" and "one run serves the team" appears under both.
  */
 export const FIT_THRESHOLD = 0.4;
 
