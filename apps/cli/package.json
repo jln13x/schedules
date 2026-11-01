@@ -1,6 +1,6 @@
 {
   "name": "agent-schedules",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Recurring tasks for AI coding agents",
   "homepage": "https://schedules.sh",
   "license": "MIT",

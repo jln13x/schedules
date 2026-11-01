@@ -16,7 +16,7 @@
     },
     "apps/cli": {
       "name": "agent-schedules",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "bin": {
         "agent-schedules": "./dist/cli.js",
       },

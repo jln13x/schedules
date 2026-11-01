@@ -1,5 +1,11 @@
 # agent-schedules
 
+## 0.3.1
+
+### Patch Changes
+
+- b819590: Releases are published from GitHub Actions with npm provenance, so each version on npm links to the commit and workflow that built it.
+
 ## 0.3.0
 
 ### Minor Changes
