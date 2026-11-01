@@ -8,7 +8,10 @@ export const config: VercelConfig = {
   installCommand: `${BUN} install --frozen-lockfile`,
   buildCommand: `${BUN} run build`,
   git: { deploymentEnabled: false },
-  crons: [{ path: "/api/sync", schedule: "0 5 * * *" }],
+  crons: [
+    { path: "/api/sync", schedule: "0 5 * * *" },
+    { path: "/api/skills/import", schedule: "15 * * * *" },
+  ],
   // Umami on our own origin, so blockers that match its host still count visits.
   rewrites: [{ source: "/u/:path*", destination: "https://umami.jlnlabs.com/:path*" }],
 };

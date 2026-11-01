@@ -1,5 +1,7 @@
 import {
   bigint,
+  boolean,
+  doublePrecision,
   bigserial,
   index,
   integer,
@@ -41,6 +43,43 @@ export const repositoryNames = SCHEDULES_SCHEMA.table(
     githubId: bigint("github_id", { mode: "number" }).notNull(),
   },
   (table) => [primaryKey({ columns: [table.owner, table.repo] })],
+);
+
+/**
+ * Every skill the directory has seen, listed or not. Remembering the rejected ones, with the content
+ * hash they were judged on, is what keeps a daily import from classifying unchanged skills again.
+ */
+export const skills = SCHEDULES_SCHEMA.table(
+  "skills",
+  {
+    /** skills.sh's id: owner/repo/skill for GitHub skills. */
+    id: text("id").primaryKey(),
+    owner: text("owner").notNull(),
+    repo: text("repo").notNull(),
+    slug: text("slug").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    installs: integer("installs").notNull().default(0),
+    /** skills.sh marks forks of another skill; they are never listed. */
+    duplicate: boolean("duplicate").notNull().default(false),
+    hash: text("hash"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    /** The hash Jev's answers below belong to; a different hash means they are stale. */
+    classifiedHash: text("classified_hash"),
+    model: text("model"),
+    recurring: doublePrecision("recurring"),
+    usefulness: integer("usefulness"),
+    /** Share of "one run serves the team" against "each person runs it"; for you is one minus it. */
+    forTeam: doublePrecision("for_team"),
+    abuse: doublePrecision("abuse"),
+    cadence: text("cadence"),
+    /** Worst security audit result on skills.sh, or null before any partner audited it. */
+    audit: text("audit"),
+    /** Why a skill is kept out of the directory by hand; null means the scores decide. */
+    hidden: text("hidden"),
+  },
+  (table) => [index().on(table.installs), index().on(table.recurring), index().on(table.fetchedAt)],
 );
 
 export const installs = SCHEDULES_SCHEMA.table(
