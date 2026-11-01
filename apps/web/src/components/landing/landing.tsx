@@ -3,7 +3,8 @@ import { Showcase } from "@/components/showcase/showcase";
 import type { ShowcaseSkill } from "@/components/showcase/showcase-skills";
 import { HeroActions, Label, WorksWith } from "./parts";
 
-const PITCH = "Agent skills worth running on a schedule";
+const PITCH = "Put your agent on a schedule";
+const PROMISE = "Skills that work while you don't.";
 
 export function Landing({
   showcase,
@@ -28,6 +29,7 @@ export function Landing({
           <p className="mt-6 text-xl leading-snug tracking-tight text-balance sm:mt-8 sm:text-2xl">
             {PITCH}
           </p>
+          <p className="text-muted-foreground mt-2 text-base sm:text-lg">{PROMISE}</p>
           <HeroActions className="mt-6 sm:mt-8" />
           <WorksWith className="mt-8 sm:mt-10" />
         </div>
