@@ -4,7 +4,8 @@ import type { ShowcaseSkill } from "@/components/showcase/showcase-skills";
 import { HeroActions, Label, WorksWith } from "./parts";
 
 const PITCH = "Put your agent on a schedule";
-const PROMISE = "Skills that work while you don't.";
+// What sets it apart from any one app's scheduler: the schedule is a file, so it travels.
+const PROMISE = "Share it between harnesses and your team.";
 
 export function Landing({
   showcase,
